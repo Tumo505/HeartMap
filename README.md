@@ -8,19 +8,19 @@
 
 > **A production-ready Python package for comprehensive single-cell heart analysis with chamber-specific insights**
 
-## 🫀 Package Overview
+## Package Overview
 
 HeartMAP is a specialized bioinformatics package that decodes cellular communication across all four chambers of the human heart. Unlike general single-cell tools, HeartMAP is purpose-built for cardiac biology, offering chamber-specific insights crucial for understanding heart function, disease, and therapeutic opportunities.
 
-**✨ Key Features:**
-- 🔧 **Production Ready**: Fully tested, documented, and deployed on PyPI
-- 🚀 **Multiple Interfaces**: CLI, Python API, REST API, and Web interface  
-- 📦 **Easy Installation**: `pip install heartmap`
-- ⚙️ **Configurable**: Works on 8GB+ RAM with memory optimization
-- 🧪 **Validated**: Tested on real human heart datasets
-- 📊 **Comprehensive**: From basic QC to advanced communication analysis
+**Key Features:**
+- **Production Ready**: Fully tested, documented, and deployed on PyPI
+- **Multiple Interfaces**: CLI, Python API, REST API, and Web interface  
+- **Easy Installation**: `pip install heartmap`
+- **Configurable**: Works on 8GB+ RAM with memory optimization
+- **Validated**: Tested on real human heart datasets
+- **Comprehensive**: From basic QC to advanced communication analysis
 
-## 📦 Quick Installation
+## Quick Installation
 
 ```bash
 # Install from PyPI
@@ -33,7 +33,7 @@ pip install heartmap[all]
 python -c "import heartmap; print('✅ HeartMAP ready!')"
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 30-Second Analysis
 ```bash
@@ -54,16 +54,16 @@ results = pipeline.run('your_data.h5ad', 'results/')
 print("✅ Analysis complete! Check 'results/' directory.")
 ```
 
-## 📚 Documentation
+## Documentation
 
 | Document | Description | Use When |
 |----------|-------------|----------|
-| **[📖 User Guide](USER_GUIDE.md)** | Complete step-by-step tutorials | Learning HeartMAP |
-| **[🔧 API Documentation](API_DOCUMENTATION.md)** | Full API reference | Programming with HeartMAP |
-| **[📦 Package README](PACKAGE_README.md)** | Package-specific documentation | Installing/using the package |
-| **[📝 Original README](README_ORIGINAL.md)** | Development documentation | Contributing to HeartMAP |
+| **[User Guide](USER_GUIDE.md)** | Complete step-by-step tutorials | Learning HeartMAP |
+| **[API Documentation](API_DOCUMENTATION.md)** | Full API reference | Programming with HeartMAP |
+| **[Package README](PACKAGE_README.md)** | Package-specific documentation | Installing/using the package |
+| **[Original README](README_ORIGINAL.md)** | Development documentation | Contributing to HeartMAP |
 
-## 🔬 What HeartMAP Can Do
+## What HeartMAP Can Do
 
 ### Analysis Pipelines
 
@@ -94,7 +94,7 @@ results1 = pipeline.run('healthy_heart.h5ad')
 results2 = pipeline.run('diseased_heart.h5ad')
 ```
 
-## ⚡ Performance
+## Performance
 
 | Hardware | Dataset Size | Memory | Runtime | Status |
 |----------|-------------|--------|---------|---------|
@@ -102,7 +102,7 @@ results2 = pipeline.run('diseased_heart.h5ad')
 | 16GB RAM | 50K cells | ~12GB | 25 min | ✅ Optimal |
 | 32GB RAM | 100K cells | ~24GB | 45 min | ✅ Production |
 
-## 🛠️ Development
+## Development
 
 ### For Contributors
 
@@ -122,32 +122,32 @@ python -m mypy src/heartmap/
 
 The package is production-ready and maintained. See the [User Guide](USER_GUIDE.md) for complete usage instructions.
 
-## 📊 Scientific Impact
+## Scientific Impact
 
-- **🏥 Clinical**: Chamber-specific therapeutic strategies
-- **🔬 Research**: First comprehensive multi-chamber communication atlas  
-- **📚 Education**: Accessible cardiac biology analysis platform
-- **🏭 Industry**: Production-ready bioinformatics tool
+- **Clinical**: Chamber-specific therapeutic strategies
+- **Research**: First comprehensive multi-chamber communication atlas  
+- **Education**: Accessible cardiac biology analysis platform
+- **Industry**: Production-ready bioinformatics tool
 
-## 🎯 Use Cases
+## Use Cases
 
 - **Pharmaceutical Research**: Drug target discovery, safety assessment
 - **Clinical Cardiology**: Precision medicine, disease mechanisms
 - **Basic Research**: Cardiac development, evolutionary biology
 - **Computational Biology**: Method benchmarking, data integration
 
-## 📋 Requirements
+## Requirements
 
 - **Python**: 3.8+ (tested on 3.8-3.11)
 - **Memory**: 8GB+ RAM (configurable)
 - **Storage**: 2GB+ for package and results
 - **OS**: Linux, macOS, Windows
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! See our [development documentation](README_ORIGINAL.md) for details.
 
-## 📖 Citation
+## Citation
 
 ```bibtex
 @software{heartmap2025,
@@ -159,20 +159,20 @@ We welcome contributions! See our [development documentation](README_ORIGINAL.md
 }
 ```
 
-## 📄 License
+## License
 
 Apache 2.0 License - see [LICENSE](LICENSE) for details.
 
-## 🆘 Support
+## Support
 
-- **📖 Documentation**: [User Guide](USER_GUIDE.md) | [API Docs](API_DOCUMENTATION.md)
-- **💬 Community**: [GitHub Discussions](https://github.com/Tumo505/HeartMap/discussions)
-- **🐛 Issues**: [GitHub Issues](https://github.com/Tumo505/HeartMap/issues)
-- **📧 Contact**: 28346416@mylife.unisa.ac.za
+- **Documentation**: [User Guide](USER_GUIDE.md) | [API Docs](API_DOCUMENTATION.md)
+- **Community**: [GitHub Discussions](https://github.com/Tumo505/HeartMap/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Tumo505/HeartMap/issues)
+- **Contact**: 28346416@mylife.unisa.ac.za
 
 ---
 
-**🎉 HeartMAP: Production-ready cardiac single-cell analysis for researchers worldwide** 🫀✨
+**HeartMAP: Production-ready cardiac single-cell analysis for researchers worldwide**
 
 *Install today: `pip install heartmap`*
 
@@ -193,7 +193,7 @@ Apache 2.0 License - see [LICENSE](LICENSE) for details.
 └── app.py                  # Gradio web interface
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Automated Setup (Recommended)
 
@@ -244,7 +244,7 @@ pip install heartmap[communication]  # Communication analysis only
 pip install heartmap[api]            # API features only
 ```
 
-## 📊 Usage Examples
+## Usage Examples
 
 ### 1. Command Line Interface
 
@@ -349,7 +349,7 @@ jupyter lab
 # - notebooks/04_comprehensive_analysis.ipynb
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 HeartMAP uses YAML configuration files for easy customization:
 
@@ -425,7 +425,7 @@ paths:
 - **Comprehensive Reports**: Automated result summaries
 - **Model Persistence**: Save complete analysis state
 
-## 🚀 Deployment Guide
+## Deployment Guide
 
 ### Local Development Setup
 
@@ -520,7 +520,7 @@ az container create --resource-group myResourceGroup \
     --name heartmap --image myregistry.azurecr.io/heartmap:latest
 ```
 
-## 📊 Scientific Results
+## Scientific Results
 
 ### Chamber Distribution
 - **RA (Right Atrium):** 28.4% of cells
@@ -539,7 +539,7 @@ az container create --resource-group myResourceGroup \
 - **RA vs LA:** r = 0.960
 - **LA vs LV:** r = 0.870 (lowest correlation)
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 ### Run Tests
 
@@ -562,7 +562,7 @@ python scripts/demo.py
 | 50K cells   | 8GB RAM     | 15 minutes     | Complete analysis |
 | 100K cells  | 16GB RAM    | 30 minutes     | Complete analysis |
 
-## 🎯 Use Cases
+## Use Cases
 
 ### Research Applications
 - **Interactive Analysis**: Jupyter notebooks for exploration
@@ -582,7 +582,7 @@ python scripts/demo.py
 - **Method Comparison**: Multiple analysis approaches
 - **Best Practices**: Clean, documented codebase
 
-## 🔒 Data Integrity & Reproducibility
+## Data Integrity & Reproducibility
 
 ### SHA-256 Checksums
 - **Purpose**: Ensure data file integrity during storage/transfer
@@ -658,7 +658,7 @@ tests/
 └── test_api.py          # API interfaces
 ```
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -706,7 +706,7 @@ model:
 4. **Mock Data**: `python scripts/demo.py` for testing
 5. **Documentation**: Comprehensive docstrings in source code
 
-## 📋 Requirements
+## Requirements
 
 ### System Requirements
 - **Python**: 3.8+ (recommended: 3.10)
@@ -721,14 +721,14 @@ model:
 - **API**: fastapi, uvicorn (optional)
 - **Web**: gradio (optional)
 
-## 🎯 Clinical Applications
+## Clinical Applications
 
 - **Personalized Medicine**: Chamber-specific treatment strategies
 - **Drug Development**: Chamber-specific therapeutic targets
 - **Disease Understanding**: Chamber-specific disease mechanisms
 - **Biomarker Discovery**: Chamber and communication-specific markers
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
@@ -738,28 +738,28 @@ model:
 
 ## 📄 License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Ssee the [LICENSE](LICENSE) file for details.
 
-## 📖 Citation
+## Citation
 
 ```bibtex
 @software{heartmap2025,
   title={HeartMAP: A Multi-Chamber Spatial Framework for Cardiac Cell-Cell Communication},
   author={Kgabeng, Tumo and Wang, Lulu and Ngwangwa, Harry and Pandelani, Thanyani},
-  year={2024},
+  year={2025},
   url={https://github.com/Tumo505/HeartMap},
   version={1.0.0},
   doi={10.5281/zenodo.16745118}
 }
 ```
 
-## 🆘 Support
+## Support
 
 - **Issues**: [GitHub Issues](https://github.com/Tumo505/HeartMap/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Tumo505/HeartMap/discussions)
 - **Email**: 28346416@mylife.unisa.ac.za
 
-## 🎉 Acknowledgments
+## Acknowledgments
 
 - Department of Mechanical, Bioresources and Biomedical Engineering, University of South Africa
 - Department of Engineering, Reykjavik University
@@ -768,6 +768,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ---
 
-**🎉 HeartMAP is now production-ready and available for research, deployment, and collaboration!**
+**HeartMAP is now production-ready and available for research, deployment, and collaboration!**
 
 Whether you're a researcher exploring cardiac biology, a developer building applications, or an educator teaching single-cell analysis, HeartMAP provides the tools and flexibility you need.
