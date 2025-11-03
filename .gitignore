@@ -38,12 +38,6 @@ models/
 # RESULTS & OUTPUT
 # ===================
 
-# Results directories
-results/
-outputs/
-figures/
-plots/
-
 # Generated figures and plots
 *.png
 *.jpg
