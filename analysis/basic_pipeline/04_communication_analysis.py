@@ -38,7 +38,43 @@ except Exception as e:
     print(f"Unexpected error importing LIANA: {e}")
     print("Install with: pip install liana")
 
-def prepare_data_for_communication(adata, cell_type_col='leiden'):
+def _load_counts_adata(processed_adata, project_root: Path):
+    """Try to load true counts from merged raw h5ad; fall back to .raw or X.
+
+    Returns an AnnData with obs aligned to processed_adata and raw set.
+    """
+    counts_adata = None
+    raw_path = project_root / 'data' / 'validation' / 'gse145154_merged.h5ad'
+    try:
+        if raw_path.exists():
+            base = sc.read_h5ad(raw_path)
+            # Align to processed obs
+            common = processed_adata.obs_names.intersection(base.obs_names)
+            if len(common) > 0:
+                base = base[common].copy()
+                processed_subset = processed_adata[common].copy()
+            else:
+                # If no overlap, just use processed
+                base = processed_adata.copy()
+                processed_subset = processed_adata
+            base.obs = processed_subset.obs.copy()
+            counts_adata = base
+    except Exception:
+        counts_adata = None
+
+    if counts_adata is None:
+        # Fallbacks
+        if processed_adata.raw is not None:
+            counts_adata = processed_adata.raw.to_adata()
+            counts_adata.obs = processed_adata.obs.copy()
+        else:
+            counts_adata = processed_adata.copy()
+
+    if counts_adata.raw is None:
+        counts_adata.raw = counts_adata
+    return counts_adata
+
+def prepare_data_for_communication(adata, cell_type_col='leiden', sample_key='sample'):
     """Prepare data for cell communication analysis"""
     print("Preparing data for communication analysis...")
     
@@ -47,16 +83,25 @@ def prepare_data_for_communication(adata, cell_type_col='leiden'):
         print(f"Warning: {cell_type_col} not found in observations")
         return None
     
-    # Get raw counts if available
-    if adata.raw is not None:
-        counts_adata = adata.raw.to_adata()
-        counts_adata.obs = adata.obs.copy()
-    else:
-        counts_adata = adata.copy()
+    # Ensure we have a sample key for LIANA by-sample APIs
+    if sample_key not in adata.obs.columns:
+        print(f"'{sample_key}' not found in observations; creating a single-sample column.")
+        adata.obs[sample_key] = 'sample_0'
+
+    # Cast grouping keys to categorical
+    try:
+        adata.obs[cell_type_col] = adata.obs[cell_type_col].astype('category')
+        adata.obs[sample_key] = adata.obs[sample_key].astype('category')
+    except Exception:
+        pass
+
+    # Prefer true counts from merged raw if present
+    project_root = Path(__file__).parent.parent.parent
+    counts_adata = _load_counts_adata(adata, project_root)
     
     return counts_adata
 
-def run_liana_analysis(adata, cell_type_col='leiden'):
+def run_liana_analysis(adata, cell_type_col='leiden', sample_key='sample'):
     """Run LIANA cell communication analysis"""
     if not LIANA_AVAILABLE:
         print("LIANA not available. Skipping LIANA analysis.")
@@ -65,15 +110,52 @@ def run_liana_analysis(adata, cell_type_col='leiden'):
     print("Running LIANA analysis...")
     
     try:
-        # Run LIANA with rank aggregate method
-        li.mt.rank_aggregate.by_sample(
-            adata,
-            groupby=cell_type_col,
-            resource_name='consensus',
-            n_perms=100,
-            seed=42,
-            verbose=True
-        )
+        # Use by-sample only when there are >= 2 samples; otherwise, use non-by-sample
+        n_samples = adata.obs[sample_key].nunique() if sample_key in adata.obs.columns else 0
+        if n_samples and n_samples >= 2:
+            res = li.mt.rank_aggregate.by_sample(
+                adata,
+                groupby=cell_type_col,
+                sample_key=sample_key,
+                resource_name='consensus',
+                n_perms=100,
+                seed=42,
+                verbose=True
+            )
+        else:
+            res = li.mt.rank_aggregate(
+                adata,
+                groupby=cell_type_col,
+                resource_name='consensus',
+                n_perms=100,
+                seed=42,
+                verbose=True
+            )
+        # LIANA+ may return various structures; normalize to DataFrame
+        stored = False
+        try:
+            import pandas as _pd  # type: ignore
+            if res is not None:
+                if isinstance(res, _pd.DataFrame):
+                    adata.uns['liana_res'] = res
+                    stored = True
+                elif isinstance(res, dict):
+                    # Common patterns: {'liana_res': df} or {'sampleA': df, ...}
+                    if 'liana_res' in res and isinstance(res['liana_res'], _pd.DataFrame):
+                        adata.uns['liana_res'] = res['liana_res']
+                        stored = True
+                    else:
+                        dfs = [v for v in res.values() if isinstance(v, _pd.DataFrame) and not v.empty]
+                        if dfs:
+                            adata.uns['liana_res'] = _pd.concat(dfs, axis=0, ignore_index=True)
+                            stored = True
+                elif isinstance(res, list):
+                    dfs = [x for x in res if isinstance(x, _pd.DataFrame) and not x.empty]
+                    if dfs:
+                        adata.uns['liana_res'] = _pd.concat(dfs, axis=0, ignore_index=True)
+                        stored = True
+        except Exception:
+            pass
         
         # Check if results were stored
         if 'liana_res' in adata.uns:
@@ -98,29 +180,91 @@ def analyze_communication_patterns(adata, save_path):
     
     # Get LIANA results
     liana_res = adata.uns['liana_res']
+
+    # Normalize possible dict/list to DataFrame
+    try:
+        import pandas as _pd  # type: ignore
+        if isinstance(liana_res, dict):
+            if 'liana_res' in liana_res and isinstance(liana_res['liana_res'], _pd.DataFrame):
+                liana_res = liana_res['liana_res']
+            else:
+                dfs = [v for v in liana_res.values() if isinstance(v, _pd.DataFrame) and not v.empty]
+                liana_res = _pd.concat(dfs, axis=0, ignore_index=True) if dfs else _pd.DataFrame()
+        elif isinstance(liana_res, list):
+            dfs = [x for x in liana_res if isinstance(x, _pd.DataFrame) and not x.empty]
+            liana_res = _pd.concat(dfs, axis=0, ignore_index=True) if dfs else _pd.DataFrame()
+    except Exception:
+        pass
+
+    if liana_res is None or getattr(liana_res, 'empty', False):
+        print("LIANA results empty. Falling back to mock analysis...")
+        create_mock_communication_analysis(adata, save_path)
+        return
     
-    # Filter significant interactions
-    significant_interactions = liana_res[liana_res['magnitude_rank'] < 0.01]
+    # Determine an appropriate ranking/score column
+    rank_col = None
+    if 'magnitude_rank' in liana_res.columns:
+        rank_col = 'magnitude_rank'
+    else:
+        # Try any column ending with '_rank'
+        rank_like = [c for c in liana_res.columns if c.endswith('_rank')]
+        if rank_like:
+            rank_col = rank_like[0]
+
+    # Filter significant interactions using rank if available; otherwise fallback to magnitude/score
+    if rank_col is not None:
+        try:
+            significant_interactions = liana_res[liana_res[rank_col] < 0.01]
+        except Exception:
+            significant_interactions = liana_res
+    else:
+        # Fallbacks: prefer higher magnitude or score
+        if 'magnitude' in liana_res.columns:
+            thr = liana_res['magnitude'].quantile(0.95)
+            significant_interactions = liana_res[liana_res['magnitude'] >= thr]
+        elif 'score' in liana_res.columns:
+            thr = liana_res['score'].quantile(0.95)
+            significant_interactions = liana_res[liana_res['score'] >= thr]
+        else:
+            significant_interactions = liana_res.head(100)
+
+    if significant_interactions.empty:
+        print("No significant interactions found. Falling back to mock analysis...")
+        create_mock_communication_analysis(adata, save_path)
+        return
     
     # Plot communication network
     fig, ax = plt.subplots(figsize=(12, 8))
     
     # Create a heatmap of communication strength
+    value_col = None
+    for cand in ['magnitude_rank', 'magnitude', 'score']:
+        if cand in significant_interactions.columns:
+            value_col = cand
+            break
+    if value_col is None:
+        value_col = significant_interactions.select_dtypes(include=[np.number]).columns.tolist()
+        value_col = value_col[0] if value_col else None
+
+    if value_col is None:
+        print("No numeric value column to plot. Skipping heatmap.")
+        return
+
     comm_matrix = significant_interactions.pivot_table(
         index='source', 
         columns='target', 
-        values='magnitude_rank',
+        values=value_col,
         aggfunc='mean'
     )
     
     sns.heatmap(comm_matrix, annot=True, cmap='viridis', ax=ax)
     plt.title('Cell-Cell Communication Strength')
     plt.tight_layout()
-    plt.savefig(save_path / "communication_heatmap.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "communication_heatmap_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
     
     # Save significant interactions
-    significant_interactions.to_csv(save_path / "significant_interactions.csv")
+    significant_interactions.to_csv(save_path / "significant_interactions_validation_gse145154.csv", index=False)
 
 def create_mock_communication_analysis(adata, save_path):
     """Create mock communication analysis when LIANA is not available"""
@@ -154,11 +298,11 @@ def create_mock_communication_analysis(adata, save_path):
     sns.heatmap(comm_matrix, annot=True, cmap='viridis', ax=ax)
     plt.title('Mock Cell-Cell Communication Strength')
     plt.tight_layout()
-    plt.savefig(save_path / "mock_communication_heatmap.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "mock_communication_heatmap_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
     
     # Save mock interactions
-    mock_interactions.to_csv(save_path / "mock_interactions.csv")
+    mock_interactions.to_csv(save_path / "mock_interactions_validation_gse145154.csv")
 
 def analyze_ligand_receptor_pairs(adata, save_path):
     """Analyze ligand-receptor pairs"""
@@ -205,11 +349,11 @@ def analyze_ligand_receptor_pairs(adata, save_path):
         sns.heatmap(expr_by_celltype, annot=True, cmap='Blues', ax=ax)
         plt.title('Ligand-Receptor Expression by Cell Type')
         plt.tight_layout()
-        plt.savefig(save_path / "ligand_receptor_expression.png", dpi=300, bbox_inches='tight')
+        plt.savefig(save_path / "ligand_receptor_expression_validation_gse145154.png", dpi=300, bbox_inches='tight')
         plt.close()
         
         # Save expression data
-        expr_by_celltype.to_csv(save_path / "ligand_receptor_expression.csv")
+        expr_by_celltype.to_csv(save_path / "ligand_receptor_expression_validation_gse145154.csv")
 
 # implement statistical tests for communication analysis
 def perform_statistical_test(data, group, strata=None, method="wilcoxon"):
@@ -252,7 +396,7 @@ print(f"Van Elteren Test: Statistic={stat}, p-value={p_value}")
 def main():
     # Load annotated data
     project_root = Path(__file__).parent.parent.parent
-    data_path = project_root / "data/processed/heart_data_annotated.h5ad"
+    data_path = project_root / "data/processed/heart_data_annotated_validation_gse145154.h5ad"
     adata = sc.read_h5ad(data_path)
     
     # Create results directories
@@ -260,7 +404,7 @@ def main():
     results_path.mkdir(parents=True, exist_ok=True)
     
     # Prepare data for communication analysis
-    comm_adata = prepare_data_for_communication(adata)
+    comm_adata = prepare_data_for_communication(adata, cell_type_col='leiden', sample_key='sample')
     
     if comm_adata is None:
         print("Could not prepare data for communication analysis")
@@ -269,7 +413,7 @@ def main():
     # Run LIANA analysis
     print(f"LIANA_AVAILABLE: {LIANA_AVAILABLE}")
     if LIANA_AVAILABLE:
-        comm_adata = run_liana_analysis(comm_adata)
+        comm_adata = run_liana_analysis(comm_adata, cell_type_col='leiden', sample_key='sample')
     else:
         print("Skipping LIANA analysis due to import failure")
     
@@ -280,7 +424,7 @@ def main():
     analyze_ligand_receptor_pairs(comm_adata, results_path)
     
     # Save communication analysis results
-    comm_adata.write(project_root / "data/processed/heart_data_communication.h5ad")
+    comm_adata.write(project_root / "data/processed/heart_data_communication_validation_gse145154.h5ad")
     
     print("Cell-cell communication analysis complete!")
 

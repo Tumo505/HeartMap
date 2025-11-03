@@ -15,22 +15,22 @@ def plot_qc_metrics(adata, save_path):
     # Violin plot: total counts per cell, number of genes per cell, and mitochondrial gene percentage
     sc.pl.violin(adata, ['n_genes_by_counts', 'total_counts', 'pct_counts_mt'],
              jitter=0.4, multi_panel=True, show=False)
-    plt.savefig(save_path / "qc_violin.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "qc_violin_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
 
     # Scatter plot: total counts vs mitochondrial gene percentage (detect contamination)
     sc.pl.scatter(adata, x='total_counts', y='pct_counts_mt', show=False)
-    plt.savefig(save_path / "qc_scatter1.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "qc_scatter1_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
 
     # Scatter plot: total counts vs number of genes per cell (detect doublets/high complexity)
     sc.pl.scatter(adata, x='total_counts', y='n_genes_by_counts', show=False)
-    plt.savefig(save_path / "qc_scatter2.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "qc_scatter2_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
 
     # Scatter plot: number of genes per cell vs mitochondrial gene percentage (detect contamination)
     sc.pl.scatter(adata, x='n_genes_by_counts', y='pct_counts_mt', show=False)
-    plt.savefig(save_path / "qc_scatter3.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "qc_scatter3_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
 
 # Filter cells and genes
@@ -88,7 +88,7 @@ def main():
     adata = normalize_data(adata)
     
     # Save filtered and normalized data
-    adata.write(project_root / "data/processed/heart_data_filtered_normalized.h5ad")
+    adata.write(project_root / "data/processed/heart_data_filtered_normalized_validation_gse145154.h5ad")
     
     print("Quality control complete!")
 

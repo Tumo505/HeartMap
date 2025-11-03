@@ -13,7 +13,7 @@ def find_variable_genes(adata, n_top_genes=2000):
     
     # Plot highly variable genes
     sc.pl.highly_variable_genes(adata, show=False)
-    plt.savefig(Path("results/figures/highly_variable_genes.png"), 
+    plt.savefig(Path("results/figures/highly_variable_genes_validation_gse145154.png"), 
                 dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -35,7 +35,7 @@ def perform_pca(adata, n_comps=50):
     
     # Plot PCA
     sc.pl.pca_variance_ratio(adata, log=True, n_pcs=50, show=False)
-    plt.savefig(Path("results/figures/pca_variance.png"), 
+    plt.savefig(Path("results/figures/pca_variance_validation_gse145154.png"), 
                 dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -85,12 +85,12 @@ def plot_clustering_results(adata, save_path):
     
     # Plot UMAP with clusters
     sc.pl.umap(adata, color=['leiden'], legend_loc='on data',
-               title='Leiden Clustering', frameon=False, save='_leiden_clustering.png')
+               title='Leiden Clustering', frameon=False, save='_leiden_clustering_validation_gse145154.png')
     
     # If cell type annotations exist, plot them too
     if 'cell_type' in adata.obs.columns:
         sc.pl.umap(adata, color=['cell_type'], legend_loc='on data',
-                   title='Cell Types', frameon=False, save='_cell_types.png')
+                   title='Cell Types', frameon=False, save='_cell_types_validation_gse145154.png')
 
 def identify_marker_genes(adata, groupby='leiden', n_genes=25):
     """Identify marker genes for each cluster"""
@@ -100,13 +100,13 @@ def identify_marker_genes(adata, groupby='leiden', n_genes=25):
     
     # Plot marker genes
     sc.pl.rank_genes_groups(adata, n_genes=n_genes, sharey=False, show=False)
-    plt.savefig(Path("results/figures/marker_genes.png"), 
+    plt.savefig(Path("results/figures/marker_genes_validation_gse145154.png"), 
                 dpi=300, bbox_inches='tight')
     plt.close()
     
     # Save marker genes to file
     marker_genes = pd.DataFrame(adata.uns['rank_genes_groups']['names'])
-    marker_genes.to_csv(Path("results/tables/marker_genes.csv"))
+    marker_genes.to_csv(Path("results/tables/marker_genes_validation_gse145154.csv"))
     
     return adata
 
@@ -149,7 +149,7 @@ def main():
     adata = identify_marker_genes(adata)
     
     # Save annotated data
-    adata.write(project_root / "data/processed/heart_data_annotated.h5ad")
+    adata.write(project_root / "data/processed/heart_data_annotated_validation_gse145154.h5ad")
     
     print("Cell annotation complete!")
 

@@ -87,7 +87,7 @@ def main():
     verify_data_integrity(data_dir, checksum_file)
     
     # Load data
-    data_path = project_root / "data/raw/healthy_human_4chamber_map_unnormalized_V3.h5ad"
+    data_path = project_root / "data/validation/gse145154_merged.h5ad"
     adata = load_and_preprocess_data(data_path)
     
     # Basic filtering

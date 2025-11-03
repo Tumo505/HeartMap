@@ -73,6 +73,10 @@ class BasicPipeline(BasePipeline):
             viz_dir = Path(output_dir) / "figures"
             viz_dir.mkdir(parents=True, exist_ok=True)
 
+            # Ensure UMAP is computed before plotting
+            if 'X_umap' not in adata.obsm_keys():
+                sc.tl.umap(adata)
+
             # UMAP plot
             sc.pl.umap(adata, color=['leiden'], legend_loc='on data',
                        title='Cell Type Clusters', show=False)

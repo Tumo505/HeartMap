@@ -46,11 +46,11 @@ def analyze_communication_specificity(adata, save_path):
     sns.heatmap(pivot_df, annot=True, cmap='viridis', fmt='.3f')
     plt.title('Cell-Type Communication Specificity')
     plt.tight_layout()
-    plt.savefig(save_path / "communication_specificity.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "communication_specificity_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
     
     # Save specificity data
-    specificity_df.to_csv(save_path / "communication_specificity.csv", index=False)
+    specificity_df.to_csv(save_path / "communication_specificity_validation_gse145154.csv", index=False)
 
 def identify_hub_cells(adata, save_path):
     """Identify cells that act as communication hubs"""
@@ -71,12 +71,12 @@ def identify_hub_cells(adata, save_path):
     
     # Plot hub scores
     sc.pl.umap(adata, color='hub_score', title='Communication Hub Score', show=False)
-    plt.savefig(save_path / "communication_hubs.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "communication_hubs_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
     
     # Identify top hub cells
     top_hubs = adata.obs.nlargest(100, 'hub_score')
-    top_hubs.to_csv(save_path / "top_hub_cells.csv")
+    top_hubs.to_csv(save_path / "top_hub_cells_validation_gse145154.csv")
 
 def analyze_pathway_enrichment(adata, save_path):
     """Analyze pathway enrichment in communication"""
@@ -125,11 +125,11 @@ def analyze_pathway_enrichment(adata, save_path):
             sns.heatmap(pathway_df, annot=True, cmap='Blues', fmt='.3f')
             plt.title('Pathway Activity by Cell Type')
             plt.tight_layout()
-            plt.savefig(save_path / "pathway_enrichment.png", dpi=300, bbox_inches='tight')
+            plt.savefig(save_path / "pathway_enrichment_validation_gse145154.png", dpi=300, bbox_inches='tight')
             plt.close()
             
             # Save pathway scores
-            pathway_df.to_csv(save_path / "pathway_scores.csv")
+            pathway_df.to_csv(save_path / "pathway_scores_validation_gse145154.csv")
         else:
             print("Warning: No pathway data available for heatmap")
     else:
@@ -141,7 +141,7 @@ def analyze_pathway_enrichment(adata, save_path):
                 ha='center', va='center', transform=plt.gca().transAxes, fontsize=12)
         plt.title('Pathway Enrichment Analysis')
         plt.axis('off')
-        plt.savefig(save_path / "pathway_enrichment.png", dpi=300, bbox_inches='tight')
+        plt.savefig(save_path / "pathway_enrichment_validation_gse145154.png", dpi=300, bbox_inches='tight')
         plt.close()
 
 def temporal_communication_analysis(adata, save_path):
@@ -207,9 +207,9 @@ def temporal_communication_analysis(adata, save_path):
 def main():
     # Load data
     project_root = Path(__file__).parent.parent.parent
-    data_path = project_root / "data/processed/heart_data_communication.h5ad"
+    data_path = project_root / "data/processed/heart_data_communication_validation_gse145154.h5ad"
     if not data_path.exists():
-        data_path = project_root / "data/processed/heart_data_annotated.h5ad"
+        data_path = project_root / "data/processed/heart_data_annotated_validation_gse145154.h5ad"
     
     adata = sc.read_h5ad(data_path)
     
@@ -224,7 +224,7 @@ def main():
     temporal_communication_analysis(adata, results_path)
     
     # Save enhanced data
-    adata.write(project_root / "data/processed/heart_data_advanced.h5ad")
+    adata.write(project_root / "data/processed/heart_data_advanced_validation_gse145154.h5ad")
     
     print("Advanced communication analysis complete!")
 

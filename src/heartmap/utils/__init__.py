@@ -90,6 +90,11 @@ class Visualizer:
         # Add hub scores to adata for plotting
         adata.obs['hub_score'] = hub_scores
 
+        # Ensure UMAP exists
+        if 'X_umap' not in adata.obsm:
+            import scanpy as sc
+            sc.tl.umap(adata)
+
         sc.pl.umap(adata, color='hub_score', title='Communication Hub Score', show=False)
         plt.savefig(save_dir / "hub_scores.png", dpi=300, bbox_inches='tight')
         plt.close()
@@ -156,6 +161,9 @@ class Visualizer:
     def plot_cross_chamber_correlations(self, correlations: pd.DataFrame, save_dir: Path) -> None:
         """Plot cross-chamber correlations"""
         if not PLOTTING_AVAILABLE:
+            return
+
+        if correlations is None or getattr(correlations, 'empty', True):
             return
 
         plt.figure(figsize=(8, 6))

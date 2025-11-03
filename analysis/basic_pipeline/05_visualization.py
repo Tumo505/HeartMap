@@ -58,7 +58,7 @@ def create_summary_plots(adata, save_path):
     axes[1,1].set_xticklabels([f'{int(x)}' for x in xticks], rotation=45)
     
     plt.tight_layout()
-    plt.savefig(save_path / "analysis_summary.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "analysis_summary_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
 
 def create_interactive_umap(adata, save_path):
@@ -76,7 +76,7 @@ def create_interactive_umap(adata, save_path):
                      hover_data=['Total_Counts'],
                      title='Interactive UMAP Plot')
     
-    fig.write_html(save_path / "interactive_umap.html")
+    fig.write_html(save_path / "interactive_umap_validation_gse145154.html")
 
 def create_communication_network(interactions_file, save_path):
     """Create communication network visualization"""
@@ -124,7 +124,7 @@ def create_communication_network(interactions_file, save_path):
     ax.set_title('Cell-Cell Communication Network')
     ax.axis('off')
     plt.tight_layout()
-    plt.savefig(save_path / "communication_network.png", dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / "communication_network_validation_gse145154.png", dpi=300, bbox_inches='tight')
     plt.close()
 
 def generate_report(adata, save_path):
@@ -154,10 +154,10 @@ def generate_report(adata, save_path):
 4. ✅ Visualization and reporting
 
 ## Files Generated
-- `analysis_summary.png`: Overview of dataset characteristics
-- `interactive_umap.html`: Interactive cell type visualization
-- `communication_network.png`: Cell communication network
-- `communication_heatmap.png`: Communication strength matrix
+- `analysis_summary_validation_gse145154.png`: Overview of dataset characteristics
+- `interactive_umap_validation_gse145154.html`: Interactive cell type visualization
+- `communication_network_validation_gse145154.png`: Cell communication network
+- `communication_heatmap_validation_gse145154.png`: Communication strength matrix
 
 ## Next Steps
 1. Validate cell type annotations with known markers
@@ -166,15 +166,15 @@ def generate_report(adata, save_path):
 4. Perform pathway enrichment analysis
 """
     
-    with open(save_path / "analysis_report.md", 'w') as f:
+    with open(save_path / "analysis_report_validation_gse145154.md", 'w', encoding='utf-8') as f:
         f.write(report)
 
 def main():
     # Load final data
     project_root = Path(__file__).parent.parent.parent
-    data_path = project_root / "data/processed/heart_data_communication.h5ad"
+    data_path = project_root / "data/processed/heart_data_communication_validation_gse145154.h5ad"
     if not data_path.exists():
-        data_path = project_root / "data/processed/heart_data_annotated.h5ad"
+        data_path = project_root / "data/processed/heart_data_annotated_validation_gse145154.h5ad"
     
     adata = sc.read_h5ad(data_path)
     
@@ -189,9 +189,9 @@ def main():
     create_interactive_umap(adata, results_path)
     
     # Create communication network
-    interactions_file = Path("results/communication/significant_interactions.csv")
+    interactions_file = Path("results/communication/significant_interactions_validation_gse145154.csv")
     if not interactions_file.exists():
-        interactions_file = Path("results/communication/mock_interactions.csv")
+        interactions_file = Path("results/communication/mock_interactions_validation_gse145154.csv")
     
     create_communication_network(interactions_file, results_path)
     

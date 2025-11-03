@@ -21,7 +21,7 @@ print("Loading full dataset...")
 # Reduced from 33,694 genes to ~5,000 genes (15% of original)
 # This provides sufficient statistical power while being manageable on 16GB RAM
 print("Loading scaled-down dataset for M1 MacBook Pro (16GB RAM)...")
-adata = sc.read_h5ad("data/raw/SCP498/anndata/healthy_human_4chamber_map_unnormalized_V4.h5ad")
+adata = sc.read_h5ad("data//SCP498/anndata/healthy_human_4chamber_map_unnormalized_V4.h5ad")
 
 # Scale down the dataset
 print("Scaling down dataset for performance...")
