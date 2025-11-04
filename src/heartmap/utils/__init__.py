@@ -178,6 +178,14 @@ class Visualizer:
         if not PLOTTING_AVAILABLE:
             return
 
+        # Ensure UMAP is computed
+        if 'X_umap' not in adata.obsm:
+            if 'neighbors' not in adata.uns:
+                if 'X_pca' not in adata.obsm:
+                    sc.tl.pca(adata, svd_solver='arpack')
+                sc.pp.neighbors(adata, n_neighbors=15, n_pcs=40)
+            sc.tl.umap(adata)
+
         # Create a large multi-panel figure
         plt.figure(figsize=(20, 16))
 

@@ -14,7 +14,7 @@ HeartMAP is a specialized bioinformatics package that decodes cellular communica
 
 **Key Features:**
 - **Production Ready**: Fully tested, documented, and deployed on PyPI
-- **Multiple Interfaces**: CLI, Python API, REST API, and Web interface  
+- **Multiple Interfaces**: CLI and Web interface
 - **Easy Installation**: `pip install heartmap`
 - **Configurable**: Works on 8GB+ RAM with memory optimization
 - **Validated**: Tested on real human heart datasets

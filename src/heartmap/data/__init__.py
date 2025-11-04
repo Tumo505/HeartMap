@@ -176,6 +176,12 @@ class DataLoader:
 
         # Log transform
         sc.pp.log1p(adata)
+        
+        # Sanitize after log1p (can create NaNs/Inf from edge cases)
+        if issparse(adata.X):
+            adata.X.data = np.nan_to_num(adata.X.data, nan=0, posinf=0, neginf=0)
+        else:
+            adata.X = np.nan_to_num(adata.X, nan=0, posinf=0, neginf=0)
 
         return adata
 
@@ -194,10 +200,35 @@ class DataProcessor:
         self.config = config
         self.loader = DataLoader(config)
 
+    @staticmethod
+    def _sanitize_before_pca(adata: ad.AnnData) -> ad.AnnData:
+        """Ensure finite values and remove empty genes/cells before PCA."""
+        adata = adata.copy()
+        # Replace NaN/Inf with zeros
+        if issparse(adata.X):
+            import numpy as _np
+            data = adata.X.data
+            if data.size:
+                adata.X.data = _np.nan_to_num(data, nan=0, posinf=0, neginf=0)
+        else:
+            adata.X = np.nan_to_num(adata.X, nan=0, posinf=0, neginf=0)
+
+        # Drop all-zero genes/cells to avoid zero-variance issues
+        try:
+            sc.pp.filter_genes(adata, min_counts=1)
+            sc.pp.filter_cells(adata, min_counts=1)
+        except Exception:
+            pass
+        return adata
+
     def process_from_raw(self,
                          file_path: str,
                          save_intermediate: bool = True) -> ad.AnnData:
         """Complete processing pipeline from raw data"""
+
+        # Ensure processed data directory exists
+        if save_intermediate:
+            os.makedirs(self.config.paths.processed_data_dir, exist_ok=True)
 
         # Load raw data
         adata = self.loader.load_raw_data(file_path)
@@ -244,6 +275,9 @@ class DataProcessor:
                 self.config.paths.processed_data_dir,
                 "normalized.h5ad"
             ))
+
+        # Final sanitization before PCA (handles web deployment NaNs)
+        adata = self._sanitize_before_pca(adata)
 
         # Compute PCA for dimensionality reduction
         sc.tl.pca(adata, svd_solver='arpack')

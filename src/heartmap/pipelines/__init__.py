@@ -63,6 +63,13 @@ class BasicPipeline(BasePipeline):
         print("1. Loading and processing data...")
         adata = self.data_processor.process_from_raw(data_path)
 
+        # Ensure neighbors graph exists (required for leiden and umap)
+        if 'neighbors' not in adata.uns:
+            print("Computing neighborhood graph...")
+            if 'X_pca' not in adata.obsm:
+                sc.tl.pca(adata, svd_solver='arpack')
+            sc.pp.neighbors(adata, n_neighbors=15, n_pcs=40)
+
         # Perform basic clustering using scanpy
         print("2. Performing cell annotation...")
         sc.tl.leiden(adata, resolution=self.config.analysis.resolution)
@@ -74,7 +81,8 @@ class BasicPipeline(BasePipeline):
             viz_dir.mkdir(parents=True, exist_ok=True)
 
             # Ensure UMAP is computed before plotting
-            if 'X_umap' not in adata.obsm_keys():
+            if 'X_umap' not in adata.obsm:
+                print("Computing UMAP...")
                 sc.tl.umap(adata)
 
             # UMAP plot
@@ -250,9 +258,21 @@ class ComprehensivePipeline(BasePipeline):
         print("1. Loading and processing data...")
         adata = self.data_processor.process_from_raw(data_path)
 
+        # Ensure neighbors graph exists (required for leiden and umap)
+        if 'neighbors' not in adata.uns:
+            print("Computing neighborhood graph...")
+            if 'X_pca' not in adata.obsm:
+                sc.tl.pca(adata, svd_solver='arpack')
+            sc.pp.neighbors(adata, n_neighbors=15, n_pcs=40)
+
         # Perform basic clustering
         print("2. Performing comprehensive analysis...")
         sc.tl.leiden(adata, resolution=self.config.analysis.resolution)
+        
+        # Ensure UMAP is computed for visualizations
+        if 'X_umap' not in adata.obsm:
+            print("Computing UMAP...")
+            sc.tl.umap(adata)
 
         # Create comprehensive results combining all analyses
         results = {
