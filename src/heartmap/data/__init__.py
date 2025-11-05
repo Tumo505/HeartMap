@@ -176,7 +176,7 @@ class DataLoader:
 
         # Log transform
         sc.pp.log1p(adata)
-        
+
         # Sanitize after log1p (can create NaNs/Inf from edge cases)
         if issparse(adata.X):
             adata.X.data = np.nan_to_num(adata.X.data, nan=0, posinf=0, neginf=0)

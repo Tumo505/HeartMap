@@ -183,7 +183,7 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
                         if ext_file.is_file():
                             try:
                                 if ext_file.suffix in ['.txt', '.csv', '.tsv', '.txt.gz', '.csv.gz', '.tsv.gz']:
-                                    print(f"📄 Attempting to read as expression matrix: {ext_file.name}")
+                                    print(f" Attempting to read as expression matrix: {ext_file.name}")
                                     adata = sc.read_csv(str(ext_file), delimiter='\t' if 'tsv' in ext_file.name else ',')
                                     break
                             except Exception as read_err:
@@ -192,13 +192,13 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
                     
                     if adata is None:
                         shutil.rmtree(temp_dir)
-                        return None, "❌ TAR archive doesn't contain compatible files (.h5ad, .h5, matrix.mtx, or expression matrices)"
+                        return None, " TAR archive doesn't contain compatible files (.h5ad, .h5, matrix.mtx, or expression matrices)"
                 
                 if adata is not None:
                     print(f"✓ Successfully loaded from TAR archive: {adata.n_obs:,} cells × {adata.n_vars:,} genes")
                 else:
                     shutil.rmtree(temp_dir)
-                    return None, "❌ TAR archive doesn't contain compatible files (.h5ad, .h5, matrix.mtx, or expression matrices)"
+                    return None, " TAR archive doesn't contain compatible files (.h5ad, .h5, matrix.mtx, or expression matrices)"
                 
                 # Cleanup temp directory
                 shutil.rmtree(temp_dir)
@@ -210,32 +210,32 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
         
         # Try reading based on file type
         elif is_h5ad:
-            print("📊 Loading AnnData (.h5ad)...")
+            print(" Loading AnnData (.h5ad)...")
             adata = sc.read_h5ad(uploaded_file)
             print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
         
         elif is_h5mu:
-            print("📊 Loading MuData (.h5mu)...")
+            print(" Loading MuData (.h5mu)...")
             try:
                 import mudata
                 mdata = mudata.read_h5mu(uploaded_file)
                 adata = mdata.mod[list(mdata.mod.keys())[0]]
                 print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
             except ImportError:
-                return None, "❌ MuData support requires: pip install mudata"
+                return None, " MuData support requires: pip install mudata"
         
         elif is_zarr:
-            print("📊 Loading Zarr array...")
+            print(" Loading Zarr array...")
             adata = sc.read_zarr(uploaded_file)
             print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
         
         elif is_h5 and not is_h5seurat:
-            print("📊 Loading 10X Genomics (.h5)...")
+            print(" Loading 10X Genomics (.h5)...")
             adata = sc.read_10x_h5(uploaded_file)
             print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
         
         elif is_mtx:
-            print("📊 Loading Matrix Market (.mtx)...")
+            print(" Loading Matrix Market (.mtx)...")
             mtx_dir = filepath.parent
             if (mtx_dir / 'genes.tsv').exists():
                 adata = sc.read_10x_mtx(str(mtx_dir))
@@ -244,43 +244,61 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
             print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
         
         elif is_loom:
-            print("📊 Loading Loom (.loom)...")
+            print(" Loading Loom (.loom)...")
             adata = sc.read_loom(uploaded_file)
             print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
         
         elif is_text:
-            print(f"📄 Loading text matrix ({filepath.suffix})...")
+            print(f" Loading text matrix ({filepath.suffix})...")
             delim = '\t' if 'tsv' in file_lower else ','
             adata = sc.read_csv(uploaded_file, delimiter=delim, first_column_names=True)
             print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
         
         elif is_parquet or is_arrow:
-            print(f"📊 Loading {'Parquet' if is_parquet else 'Arrow'}...")
+            print(f" Loading {'Parquet' if is_parquet else 'Arrow'}...")
             try:
                 import pandas as pd
                 df = pd.read_parquet(uploaded_file) if is_parquet else pd.read_feather(uploaded_file)
                 adata = ad.AnnData(df)
                 print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
             except ImportError:
-                return None, "❌ Parquet/Arrow requires: pip install pyarrow"
+                return None, " Parquet/Arrow requires: pip install pyarrow"
         
         elif is_hdf5:
-            print("📊 Loading generic HDF5...")
+            print(" Loading generic HDF5...")
             with h5py.File(uploaded_file, 'r') as f:
                 X = f.get('matrix', f.get('X', f.get('data', None)))
                 if X is None:
-                    return None, "❌ HDF5 file missing required keys (matrix/X/data)"
+                    return None, " HDF5 file missing required keys (matrix/X/data)"
                 adata = ad.AnnData(X[()])
             print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
         
         elif is_h5seurat or is_rds:
-            return None, ("❌ Seurat/R formats require conversion:\n\n"
-                         "R> library(SeuratDisk)\n"
-                         "R> Convert('file.h5seurat', dest='h5ad')\n\n"
-                         "Or use: library(anndata); write_h5ad(seurat_obj, 'output.h5ad')")
+            filename = filepath.name
+            return None, (f" **Seurat/R Format Detected: `{filename}`**\n\n"
+                         f"This file format requires conversion to AnnData (.h5ad) before analysis.\n\n"
+                         f"**Option 1: Using SeuratDisk (Recommended)**\n"
+                         f"```r\n"
+                         f"# In R/RStudio:\n"
+                         f"library(Seurat)\n"
+                         f"library(SeuratDisk)\n\n"
+                         f"# Load your Seurat object\n"
+                         f"seurat_obj <- readRDS('{filename}')\n\n"
+                         f"# Convert to h5ad format\n"
+                         f"SaveH5Seurat(seurat_obj, filename = 'output.h5Seurat')\n"
+                         f"Convert('output.h5Seurat', dest = 'h5ad')\n"
+                         f"```\n\n"
+                         f"**Option 2: Using sceasy**\n"
+                         f"```r\n"
+                         f"library(sceasy)\n"
+                         f"sceasy::convertFormat(seurat_obj, from='seurat', to='anndata',\n"
+                         f"                       outFile='output.h5ad')\n"
+                         f"```\n\n"
+                         f"Then upload the generated `output.h5ad` file to HeartMAP.\n\n"
+                         f"**Need help?** See [FORMAT_SUPPORT_GUIDE.md](https://github.com/Tumo505/HeartMap/blob/master/FORMAT_SUPPORT_GUIDE.md) for detailed instructions.")
         
         else:
-            return None, (f"❌ Unsupported format: {filepath.suffix}\n\n"
+            return None, (f" Unsupported format: {filepath.suffix}\n\n"
                          f"**Supported formats:**\n"
                          f"• AnnData: .h5ad, .h5mu (MuData), .zarr\n"
                          f"• 10X: .h5, .mtx (Matrix Market)\n"
@@ -790,7 +808,7 @@ def analyze_heart_data(
         
         # Check if loading failed
         if adata is None:
-            error_msg = f"❌ **Data Loading Failed**\n\n{validation_msg}"
+            error_msg = f" **Data Loading Failed**\n\n{validation_msg}"
             return error_msg, None, None, None, None, None, None, None
 
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -268,7 +268,7 @@ class ComprehensivePipeline(BasePipeline):
         # Perform basic clustering
         print("2. Performing comprehensive analysis...")
         sc.tl.leiden(adata, resolution=self.config.analysis.resolution)
-        
+
         # Ensure UMAP is computed for visualizations
         if 'X_umap' not in adata.obsm:
             print("Computing UMAP...")
