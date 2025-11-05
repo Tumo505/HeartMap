@@ -148,14 +148,14 @@ def main():
         config, loaded_config = example_config_management()
         print()
         
-        print("✅ All examples completed successfully!")
+        print(" All examples completed successfully!")
         print("\nNext steps:")
         print("1. Prepare your single-cell RNA-seq data in h5ad format")
         print("2. Run: heartmap your_data.h5ad --analysis-type comprehensive")
         print("3. Check results in the output directory")
         
     except Exception as e:
-        print(f"❌ Error running examples: {e}")
+        print(f" Error running examples: {e}")
         print("Make sure all dependencies are installed: pip install -e .[all]")
 
 

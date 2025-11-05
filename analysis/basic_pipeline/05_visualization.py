@@ -148,10 +148,10 @@ def generate_report(adata, save_path):
 - **Mean mitochondrial %**: {adata.obs['pct_counts_mt'].mean():.2f}%
 
 ## Analysis Steps Completed
-1. ✅ Data preprocessing and quality control
-2. ✅ Cell type annotation and clustering
-3. ✅ Cell-cell communication analysis
-4. ✅ Visualization and reporting
+1.  Data preprocessing and quality control
+2.  Cell type annotation and clustering
+3.  Cell-cell communication analysis
+4.  Visualization and reporting
 
 ## Files Generated
 - `analysis_summary_validation_gse145154.png`: Overview of dataset characteristics

@@ -5,7 +5,7 @@
 
 set -e  # Exit on any error
 
-echo "🫀 HeartMAP Quick Start Setup"
+echo " HeartMAP Quick Start Setup"
 echo "=============================="
 
 # Colors for output
@@ -231,7 +231,7 @@ main() {
     download_example_data
     
     echo ""
-    echo "🎉 Setup completed successfully!"
+    echo " Setup completed successfully!"
     echo ""
     echo "Next steps:"
     echo "1. Activate environment: source heartmap_env/bin/activate  (Linux/Mac) or heartmap_env\\Scripts\\activate (Windows)"

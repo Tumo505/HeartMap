@@ -258,9 +258,9 @@ class ResultsExporter:
 - **Total Genes**: {n_genes:,}
 
 ## Analysis Components Completed
-- ✅ Cell type annotation
-- ✅ Cell-cell communication analysis
-- ✅ Multi-chamber analysis
+-  Cell type annotation
+-  Cell-cell communication analysis
+-  Multi-chamber analysis
 
 ## Key Findings
 

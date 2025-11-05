@@ -25,10 +25,10 @@ leiden
 - **Mean mitochondrial %**: 0.21%
 
 ## Analysis Steps Completed
-1. ✅ Data preprocessing and quality control
-2. ✅ Cell type annotation and clustering
-3. ✅ Cell-cell communication analysis
-4. ✅ Visualization and reporting
+1.  Data preprocessing and quality control
+2.  Cell type annotation and clustering
+3.  Cell-cell communication analysis
+4.  Visualization and reporting
 
 ## Files Generated
 - `analysis_summary.png`: Overview of dataset characteristics

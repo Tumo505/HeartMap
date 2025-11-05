@@ -18,36 +18,36 @@ def test_imports():
     
     try:
         from heartmap import HeartMapModel, Config
-        print("✅ Core HeartMAP imports successful")
+        print(" Core HeartMAP imports successful")
         
         from heartmap.config import DataConfig, AnalysisConfig, ModelConfig, PathConfig
-        print("✅ Configuration classes imported")
+        print(" Configuration classes imported")
         
         # from heartmap.models import (
         #     BaseModel, CellAnnotationModel, CommunicationModel, 
         #     MultiChamberModel
         # )
-        # print("✅ Model classes imported")
+        # print(" Model classes imported")
         
         from heartmap.pipelines import (
             BasePipeline, BasicPipeline, AdvancedCommunicationPipeline,
             MultiChamberPipeline, ComprehensivePipeline
         )
-        print("✅ Pipeline classes imported")
+        print(" Pipeline classes imported")
         
         from heartmap.data import DataLoader, DataProcessor
-        print("✅ Data processing classes imported")
+        print(" Data processing classes imported")
         
         from heartmap.utils import setup_logging, create_logger
-        print("✅ Utility functions imported")
+        print(" Utility functions imported")
         
         from heartmap.api import HeartMapAPI, CLIInterface
-        print("✅ API classes imported")
+        print(" API classes imported")
         
         return True
         
     except Exception as e:
-        print(f"❌ Import failed: {e}")
+        print(f" Import failed: {e}")
         traceback.print_exc()
         return False
 
@@ -59,25 +59,25 @@ def test_config():
         # Test default config
         from heartmap import Config
         config = Config.default()
-        print("✅ Default configuration created")
+        print(" Default configuration created")
         
         # Test config validation
         assert config.data.min_genes > 0
         assert config.data.min_cells > 0
         assert config.analysis.n_neighbors > 0
-        print("✅ Configuration validation passed")
+        print(" Configuration validation passed")
         
         # Test YAML loading (if config file exists)
         if os.path.exists('config.yaml'):
             config_from_file = Config.from_file('config.yaml')
-            print("✅ Configuration loaded from YAML")
+            print(" Configuration loaded from YAML")
         else:
             print("⚠️  config.yaml not found, skipping file loading test")
         
         return True
         
     except Exception as e:
-        print(f"❌ Configuration test failed: {e}")
+        print(f" Configuration test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -113,15 +113,15 @@ def test_data_loader():
         data_loader = DataLoader(config)
         processed_adata = data_loader.preprocess(adata)
         
-        print(f"✅ Data preprocessing successful: {processed_adata.shape}")
+        print(f" Data preprocessing successful: {processed_adata.shape}")
         assert processed_adata.n_obs <= config.data.max_cells_subset
         assert processed_adata.n_vars <= config.data.max_genes_subset
-        print("✅ Data subsetting working correctly")
+        print(" Data subsetting working correctly")
         
         return True
         
     except Exception as e:
-        print(f"❌ Data loading test failed: {e}")
+        print(f" Data loading test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -140,12 +140,12 @@ def test_model_creation():
         config.data.test_mode = True
         
         # Note: Model classes are currently placeholders
-        print("✅ Model functionality disabled (models directory empty)")
+        print(" Model functionality disabled (models directory empty)")
         
         return True
         
     except Exception as e:
-        print(f"❌ Model creation test failed: {e}")
+        print(f" Model creation test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -162,16 +162,16 @@ def test_pipeline():
         
         # Test basic pipeline
         basic_pipeline = BasicPipeline(config)
-        print("✅ Basic pipeline created")
+        print(" Basic pipeline created")
         
         # Test comprehensive pipeline
         comp_pipeline = ComprehensivePipeline(config)
-        print("✅ Comprehensive pipeline created")
+        print(" Comprehensive pipeline created")
         
         return True
         
     except Exception as e:
-        print(f"❌ Pipeline test failed: {e}")
+        print(f" Pipeline test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -188,16 +188,16 @@ def test_api():
         
         # Test API creation
         api = HeartMapAPI(config)
-        print("✅ HeartMAP API created")
+        print(" HeartMAP API created")
         
         # Test CLI creation
         cli = CLIInterface()
-        print("✅ CLI interface created")
+        print(" CLI interface created")
         
         return True
         
     except Exception as e:
-        print(f"❌ API test failed: {e}")
+        print(f" API test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -210,17 +210,17 @@ def test_utilities():
         
         # Test logging setup
         setup_logging()
-        print("✅ Logging setup successful")
+        print(" Logging setup successful")
         
         # Test logger creation
         logger = create_logger("test")
         logger.info("Test log message")
-        print("✅ Logger creation successful")
+        print(" Logger creation successful")
         
         return True
         
     except Exception as e:
-        print(f"❌ Utilities test failed: {e}")
+        print(f" Utilities test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -238,22 +238,22 @@ def check_dependencies():
     for package in required_packages:
         try:
             __import__(package)
-            print(f"✅ {package} available")
+            print(f" {package} available")
         except ImportError:
-            print(f"❌ {package} missing")
+            print(f" {package} missing")
             missing_packages.append(package)
     
     if missing_packages:
-        print(f"\n❌ Missing required packages: {missing_packages}")
+        print(f"\n Missing required packages: {missing_packages}")
         print("Install with: pip install " + " ".join(missing_packages))
         return False
     else:
-        print("✅ All required dependencies available")
+        print(" All required dependencies available")
         return True
 
 def main():
     """Run all validation tests."""
-    print("🫀 HeartMAP Validation Suite")
+    print(" HeartMAP Validation Suite")
     print("=" * 50)
     
     tests = [
@@ -274,7 +274,7 @@ def main():
             success = test_func()
             results.append((test_name, success))
         except Exception as e:
-            print(f"\n❌ {test_name} test crashed: {e}")
+            print(f"\n {test_name} test crashed: {e}")
             results.append((test_name, False))
     
     # Summary
@@ -284,7 +284,7 @@ def main():
     
     passed = 0
     for test_name, success in results:
-        status = "✅ PASS" if success else "❌ FAIL"
+        status = " PASS" if success else " FAIL"
         print(f"{status} {test_name}")
         if success:
             passed += 1
@@ -292,7 +292,7 @@ def main():
     print(f"\nTests passed: {passed}/{len(tests)}")
     
     if passed == len(tests):
-        print("\n🎉 All tests passed! HeartMAP is ready to use.")
+        print("\n All tests passed! HeartMAP is ready to use.")
         print("\nNext steps:")
         print("1. Run ./scripts/setup.sh for full environment setup")
         print("2. Try the quickstart notebook: notebooks/quickstart_example.ipynb")

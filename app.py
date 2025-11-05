@@ -171,7 +171,38 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
                         adata = None
                 elif mtx_dirs:
                     print(f"✓ Found matrix.mtx format. Loading from {mtx_dirs[0].name}...")
-                    adata = sc.read_10x_mtx(str(mtx_dirs[0]))
+                    mtx_dir = mtx_dirs[0]
+                    
+                    # Check for required files (matrix, genes/features, barcodes)
+                    mtx_files = list(mtx_dir.glob('matrix.mtx*'))
+                    gene_files = list(mtx_dir.glob('genes.tsv*')) or list(mtx_dir.glob('features.tsv*'))
+                    barcode_files = list(mtx_dir.glob('barcodes.tsv*'))
+                    
+                    print(f"  Found in {mtx_dir.name}:")
+                    print(f"    Matrix files: {[f.name for f in mtx_files]}")
+                    print(f"    Gene/feature files: {[f.name for f in gene_files]}")
+                    print(f"    Barcode files: {[f.name for f in barcode_files]}")
+                    
+                    # Decompress .gz files if present
+                    import gzip
+                    for file_list in [mtx_files, gene_files, barcode_files]:
+                        for f in file_list:
+                            if f.name.endswith('.gz'):
+                                print(f"  Decompressing {f.name}...")
+                                decompressed_path = f.parent / f.name[:-3]  # Remove .gz
+                                if not decompressed_path.exists():
+                                    with gzip.open(f, 'rb') as f_in:
+                                        with open(decompressed_path, 'wb') as f_out:
+                                            f_out.write(f_in.read())
+                                    print(f"    ✓ Decompressed to {decompressed_path.name}")
+                    
+                    # Try to read the MTX directory
+                    try:
+                        adata = sc.read_10x_mtx(str(mtx_dir))
+                        print(f"  ✓ Successfully loaded MTX format")
+                    except Exception as mtx_err:
+                        print(f"  ⚠ Failed to load MTX: {str(mtx_err)[:200]}")
+                        adata = None
                 else:
                     adata = None
                 
@@ -396,6 +427,11 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
                         f"3. Or use an older AnnData format: `adata.write_h5ad('file.h5ad', as_dense='X')`\n\n"
                         f"**Technical details:** {str(e3)}"
                     )
+        else:
+            # Not a compatibility error - return the original error
+            import traceback
+            return None, (f" **Error loading data:**\n\n{str(e)}\n\n"
+                         f"**Traceback:**\n```\n{traceback.format_exc()}\n```")
 
     try:
         # Check for chamber information
@@ -774,32 +810,57 @@ def analyze_heart_data(
     """
 
     if not HEARTMAP_AVAILABLE:
-        return " HeartMAP not available. Please install dependencies.", None, None, None, None, None, None, ""
+        return " HeartMAP not available. Please install dependencies.", None, None, None, None, None, None, "", None
 
     if uploaded_file is None:
-        return " Please upload a file.", None, None, None, None, None, None, ""
+        return " Please upload a file.", None, None, None, None, None, None, "", None
 
     # Validate file upload completed successfully
     try:
         if not Path(uploaded_file).exists():
-            return " Upload incomplete. Please try uploading the file again.", None, None, None, None, None, None, ""
+            return " Upload incomplete. Please try uploading the file again.", None, None, None, None, None, None, "", None
 
         file_size_mb = Path(uploaded_file).stat().st_size / (1024 * 1024)
         file_size_gb = file_size_mb / 1024
         print(f"Processing file: {file_size_mb:.2f} MB ({file_size_gb:.2f} GB)")
 
         if file_size_mb > 10240:  # 10GB limit
-            return f" File size ({file_size_gb:.2f} GB) exceeds maximum limit (10 GB). Please use a smaller dataset or subset your data.", None, None, None, None, None, None, ""
+            return f" File size ({file_size_gb:.2f} GB) exceeds maximum limit (10 GB). Please use a smaller dataset or subset your data.", None, None, None, None, None, None, "", None
         elif file_size_mb > 1024:  # Warn for files > 1GB
             print(f"Large file detected ({file_size_gb:.2f} GB). Processing may take 10-30 minutes...")
         elif file_size_mb > 500:
             print(f"Large file detected ({file_size_mb:.1f} MB). Processing may take several minutes...")
     except Exception as e:
-        return f" File validation error: {str(e)}. Please re-upload the file.", None, None, None, None, None, None, ""
+        return f" File validation error: {str(e)}. Please re-upload the file.", None, None, None, None, None, None, "", None
 
     persistent_csv = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
     persistent_csv_path = persistent_csv.name
     persistent_csv.close()
+    
+    # Create persistent temporary files for visualizations (outside temp_dir context)
+    persistent_viz_chamber = tempfile.NamedTemporaryFile(mode='w', suffix='_chamber_distribution.html', delete=False)
+    persistent_viz_chamber_path = persistent_viz_chamber.name
+    persistent_viz_chamber.close()
+    
+    persistent_viz_hubs = tempfile.NamedTemporaryFile(mode='w', suffix='_hub_scores.html', delete=False)
+    persistent_viz_hubs_path = persistent_viz_hubs.name
+    persistent_viz_hubs.close()
+    
+    persistent_viz_corr = tempfile.NamedTemporaryFile(mode='w', suffix='_correlations.html', delete=False)
+    persistent_viz_corr_path = persistent_viz_corr.name
+    persistent_viz_corr.close()
+    
+    persistent_viz_markers = tempfile.NamedTemporaryFile(mode='w', suffix='_markers.html', delete=False)
+    persistent_viz_markers_path = persistent_viz_markers.name
+    persistent_viz_markers.close()
+    
+    persistent_viz_network = tempfile.NamedTemporaryFile(mode='w', suffix='_network.html', delete=False)
+    persistent_viz_network_path = persistent_viz_network.name
+    persistent_viz_network.close()
+    
+    persistent_chamber_info = tempfile.NamedTemporaryFile(mode='w', suffix='_chamber_details.txt', delete=False)
+    persistent_chamber_info_path = persistent_chamber_info.name
+    persistent_chamber_info.close()
 
     try:
         # Load and validate data
@@ -1268,6 +1329,47 @@ Download the HTML files below for fully interactive analysis!
                 for chamber, genes in chamber_markers.items():
                     chamber_info_text += f"\n{chamber}: {', '.join([g[0] for g in genes[:5]])}"
             
+            # Save chamber info to file
+            chamber_info_file_path = None
+            if chamber_info_text:
+                with open(persistent_chamber_info_path, 'w', encoding='utf-8') as f:
+                    f.write("=" * 80 + "\n")
+                    f.write("CHAMBER DETAILS & MARKER GENES\n")
+                    f.write("=" * 80 + "\n\n")
+                    f.write(chamber_info_text)
+                chamber_info_file_path = persistent_chamber_info_path
+            
+            # Copy visualization files to persistent location before temp_dir is deleted
+            if viz_chamber_file and Path(viz_chamber_file).exists():
+                shutil.copy2(viz_chamber_file, persistent_viz_chamber_path)
+                viz_chamber_file = persistent_viz_chamber_path
+            else:
+                viz_chamber_file = None
+            
+            if viz_hubs_file and Path(viz_hubs_file).exists():
+                shutil.copy2(viz_hubs_file, persistent_viz_hubs_path)
+                viz_hubs_file = persistent_viz_hubs_path
+            else:
+                viz_hubs_file = None
+            
+            if viz_corr_file and Path(viz_corr_file).exists():
+                shutil.copy2(viz_corr_file, persistent_viz_corr_path)
+                viz_corr_file = persistent_viz_corr_path
+            else:
+                viz_corr_file = None
+            
+            if viz_markers_file and Path(viz_markers_file).exists():
+                shutil.copy2(viz_markers_file, persistent_viz_markers_path)
+                viz_markers_file = persistent_viz_markers_path
+            else:
+                viz_markers_file = None
+            
+            if viz_network_file and Path(viz_network_file).exists():
+                shutil.copy2(viz_network_file, persistent_viz_network_path)
+                viz_network_file = persistent_viz_network_path
+            else:
+                viz_network_file = None
+            
             return (
                 output_msg, 
                 persistent_csv_path, 
@@ -1276,7 +1378,8 @@ Download the HTML files below for fully interactive analysis!
                 viz_corr_file,
                 viz_markers_file,
                 viz_network_file,
-                chamber_info_text if chamber_info_text else "No chamber data"
+                chamber_info_text if chamber_info_text else "No chamber data",
+                chamber_info_file_path
             )
     
     except Exception as e:
@@ -1301,14 +1404,22 @@ The file upload was interrupted. This usually happens when:
         else:
             error_msg = f"**Error during analysis:**\n\n{str(e)}\n\n**Technical details:**\n```\n{traceback.format_exc()}\n```"
         
-        return error_msg, None, None, None, None, None, None, ""
+        return error_msg, None, None, None, None, None, None, "", None
 
 
 # Create Gradio interface with enhanced features
 with gr.Blocks(
     title="HeartMAP: Heart Multi-chamber Analysis Platform",
     theme=gr.themes.Soft(),
-    analytics_enabled=False
+    analytics_enabled=False,
+    css="""
+        .resizable-textbox textarea {
+            resize: both !important;
+            overflow: auto !important;
+            min-height: 200px !important;
+            max-height: none !important;
+        }
+    """
 ) as demo:
     gr.Markdown("""
     # HeartMAP: Multi-chamber Heart Analysis
@@ -1433,7 +1544,13 @@ with gr.Blocks(
             chamber_info = gr.Textbox(
                 label="Chamber Details & Marker Genes",
                 interactive=False,
-                max_lines=20
+                max_lines=50,
+                elem_classes="resizable-textbox"
+            )
+            
+            chamber_info_file = gr.File(
+                label="Download Chamber Details & Marker Genes (TXT)",
+                file_types=[".txt"]
             )
 
     # Analysis pipeline
@@ -1455,7 +1572,8 @@ with gr.Blocks(
             viz_file_3,
             viz_file_4,
             viz_file_5,
-            chamber_info
+            chamber_info,
+            chamber_info_file
         ]
     )
 

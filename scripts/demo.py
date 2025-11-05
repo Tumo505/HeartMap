@@ -16,7 +16,7 @@ from heartmap.data import DataLoader
 
 def create_demo_data():
     """Create mock single-cell heart data for demonstration"""
-    print("📊 Creating mock heart data...")
+    print(" Creating mock heart data...")
     
     # Parameters
     n_cells = 500
@@ -44,7 +44,7 @@ def create_demo_data():
     # Create AnnData object
     adata = ad.AnnData(X=X, obs=obs, var=var)
     
-    print(f"✅ Created mock data: {n_cells} cells, {n_genes} genes")
+    print(f" Created mock data: {n_cells} cells, {n_genes} genes")
     print(f"   Chambers: {list(obs['chamber'].unique())}")
     print(f"   Cell types: {list(obs['cell_type'].unique())}")
     
@@ -63,7 +63,7 @@ def demo_configuration():
     config.data.test_mode = True  # Enable test mode
     config.model.model_type = "basic"
     
-    print(f"✅ Configuration created:")
+    print(f" Configuration created:")
     print(f"   Model type: {config.model.model_type}")
     print(f"   Max cells: {config.data.max_cells_subset}")
     print(f"   Max genes: {config.data.max_genes_subset}")
@@ -73,7 +73,7 @@ def demo_configuration():
 
 def demo_data_loading(adata, config):
     """Demonstrate data loading and preprocessing"""
-    print("\n🔄 Processing data...")
+    print("\n Processing data...")
     
     # Initialize data loader
     data_loader = DataLoader(config)
@@ -81,7 +81,7 @@ def demo_data_loading(adata, config):
     # Preprocess data
     processed_adata = data_loader.preprocess(adata)
     
-    print(f"✅ Data processing completed:")
+    print(f" Data processing completed:")
     print(f"   Original: {adata.shape}")
     print(f"   Processed: {processed_adata.shape}")
     
@@ -89,14 +89,14 @@ def demo_data_loading(adata, config):
 
 def demo_analysis(processed_adata, config):
     """Demonstrate basic analysis"""
-    print("\n🧬 Running HeartMAP analysis...")
+    print("\n Running HeartMAP analysis...")
     
     # Initialize HeartMAP model
     model = HeartMapModel(config)
     
     # For demo, we'll just show the model creation
     # Full analysis would be: results = model.analyze(processed_adata)
-    print("✅ HeartMAP model initialized successfully")
+    print(" HeartMAP model initialized successfully")
     print(f"   Model type: {config.model.model_type}")
     print(f"   Configuration: {config.data.max_cells_subset} max cells")
     
@@ -109,7 +109,7 @@ def demo_analysis(processed_adata, config):
         'cell_types_detected': processed_adata.obs['cell_type'].unique().tolist()
     }
     
-    print(f"📊 Analysis summary:")
+    print(f" Analysis summary:")
     print(f"   Cells analyzed: {results['n_cells_analyzed']}")
     print(f"   Genes analyzed: {results['n_genes_analyzed']}")
     print(f"   Chambers: {results['chambers_detected']}")
@@ -119,7 +119,7 @@ def demo_analysis(processed_adata, config):
 
 def demo_visualization(results):
     """Create simple visualization"""
-    print("\n📈 Creating visualizations...")
+    print("\n Creating visualizations...")
     
     adata = results['processed_data']
     
@@ -147,11 +147,11 @@ def demo_visualization(results):
     plt.savefig('figures/demo_results.png', dpi=150, bbox_inches='tight')
     plt.show()
     
-    print("✅ Visualization saved to: figures/demo_results.png")
+    print(" Visualization saved to: figures/demo_results.png")
 
 def main():
     """Main demo function"""
-    print("🫀 HeartMAP Quick Demo")
+    print(" HeartMAP Quick Demo")
     print("=" * 50)
     
     try:
@@ -174,7 +174,7 @@ def main():
         # Step 5: Visualize results
         demo_visualization(results)
         
-        print("\n🎉 Demo completed successfully!")
+        print("\n Demo completed successfully!")
         print("\nNext steps:")
         print("1. Try with real data: place .h5ad files in data/raw/")
         print("2. Use command line: heartmap data/raw/healthy_human_4chamber_map_unnormalized_V3.h5ad")
@@ -183,7 +183,7 @@ def main():
         print("5. Read documentation: DEPLOYMENT_GUIDE.md")
         
     except Exception as e:
-        print(f"❌ Demo failed: {e}")
+        print(f" Demo failed: {e}")
         print("Please check the installation and try again.")
         
 if __name__ == "__main__":

@@ -28,14 +28,14 @@ cp ../huggingface_files/config.yaml .
 cp -r ../huggingface_files/src .
 
 # Verify required files
-echo "✅ Verifying required files..."
+echo " Verifying required files..."
 required_files=("app.py" "requirements.txt" "README.md" "config.yaml" ".gitignore")
 
 for file in "${required_files[@]}"; do
     if [[ -f "$file" ]]; then
         echo "  ✓ $file"
     else
-        echo "  ❌ Missing: $file"
+        echo "   Missing: $file"
         exit 1
     fi
 done
@@ -44,7 +44,7 @@ done
 if [[ -d "src" ]]; then
     echo "  ✓ src/ directory"
 else
-    echo "  ❌ Missing: src/ directory"
+    echo "   Missing: src/ directory"
     exit 1
 fi
 
@@ -72,7 +72,7 @@ echo "   git commit -m 'Deploy HeartMAP platform'"
 echo "   git push"
 echo ""
 echo "⚠️  IMPORTANT: Clone the HF space OUTSIDE this project directory!"
-echo "🎉 Your HeartMAP space will be available at:"
+echo " Your HeartMAP space will be available at:"
 echo "   $REPO_URL"
 
 cd ..

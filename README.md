@@ -30,7 +30,7 @@ pip install heartmap
 pip install heartmap[all]
 
 # Verify installation
-python -c "import heartmap; print('✅ HeartMAP ready!')"
+python -c "import heartmap; print(' HeartMAP ready!')"
 ```
 
 ## Quick Start
@@ -51,7 +51,7 @@ config = Config.default()
 pipeline = ComprehensivePipeline(config)
 results = pipeline.run('your_data.h5ad', 'results/')
 
-print("✅ Analysis complete! Check 'results/' directory.")
+print(" Analysis complete! Check 'results/' directory.")
 ```
 
 ## Documentation
@@ -98,9 +98,9 @@ results2 = pipeline.run('diseased_heart.h5ad')
 
 | Hardware | Dataset Size | Memory | Runtime | Status |
 |----------|-------------|--------|---------|---------|
-| 8GB RAM | 30K cells | ~6GB | 15 min | ✅ Recommended |
-| 16GB RAM | 50K cells | ~12GB | 25 min | ✅ Optimal |
-| 32GB RAM | 100K cells | ~24GB | 45 min | ✅ Production |
+| 8GB RAM | 30K cells | ~6GB | 15 min |  Recommended |
+| 16GB RAM | 50K cells | ~12GB | 25 min |  Optimal |
+| 32GB RAM | 100K cells | ~24GB | 45 min |  Production |
 
 ## Development
 

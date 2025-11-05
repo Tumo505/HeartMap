@@ -58,7 +58,7 @@ def migrate_legacy_analysis():
     print("5. Creating deployment files...")
     create_deployment_files(project_root)
     
-    print("✅ Migration completed!")
+    print(" Migration completed!")
     print("\nNext steps:")
     print("1. Install the new package: pip install -e .[all]")
     print("2. Run tests: python tests/test_heartmap.py")
