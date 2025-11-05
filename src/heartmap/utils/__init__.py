@@ -300,8 +300,8 @@ class ResultsExporter:
 3. Apply model to new datasets
 """
 
-        # Save report
-        with open(output_path / "analysis_report.md", 'w') as f:
+        # Save report (UTF-8 encoding for emoji support on Windows)
+        with open(output_path / "analysis_report.md", 'w', encoding='utf-8') as f:
             f.write(report)
 
 
