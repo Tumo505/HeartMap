@@ -1,0 +1,196 @@
+name: Publish to PyPI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - 'src/**'
+      - 'setup.py'
+      - 'requirements.txt'
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Check if code changed
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          else
+            # Check if relevant files changed
+            git diff --name-only HEAD^ HEAD > changed_files.txt
+            if grep -qE '^(src/|setup.py|requirements.txt)' changed_files.txt; then
+              echo "should_publish=true" >> $GITHUB_OUTPUT
+            else
+              echo "should_publish=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  build-and-publish:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine bump2version
+      
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from heartmap import __version__; print(__version__)")
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+      
+      - name: Determine version bump type
+        id: bump_type
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BUMP_TYPE="${{ github.event.inputs.version_bump }}"
+          else
+            # Auto-detect from commit message
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            if echo "$COMMIT_MSG" | grep -qiE '(breaking|major)'; then
+              BUMP_TYPE="major"
+            elif echo "$COMMIT_MSG" | grep -qiE '(feature|feat|minor)'; then
+              BUMP_TYPE="minor"
+            else
+              BUMP_TYPE="patch"
+            fi
+          fi
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "Version bump type: $BUMP_TYPE"
+      
+      - name: Bump version
+        id: bump_version
+        run: |
+          # Bump version in __init__.py
+          bump2version ${{ steps.bump_type.outputs.bump_type }} \
+            --current-version ${{ steps.current_version.outputs.version }} \
+            --allow-dirty \
+            --no-commit \
+            --no-tag \
+            src/heartmap/__init__.py
+          
+          # Get new version
+          NEW_VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from heartmap import __version__; print(__version__)")
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+      
+      - name: Update CHANGELOG
+        run: |
+          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
+          DATE=$(date +%Y-%m-%d)
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          
+          # Create or update CHANGELOG.md
+          if [ ! -f CHANGELOG.md ]; then
+            echo "# Changelog" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
+          
+          # Add new version entry at the top
+          {
+            echo "## [$NEW_VERSION] - $DATE"
+            echo ""
+            echo "### Changes"
+            echo "- $COMMIT_MSG"
+            echo ""
+            cat CHANGELOG.md
+          } > CHANGELOG.tmp
+          mv CHANGELOG.tmp CHANGELOG.md
+      
+      - name: Commit version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add src/heartmap/__init__.py CHANGELOG.md
+          git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }} [skip ci]"
+          git tag v${{ steps.bump_version.outputs.new_version }}
+      
+      - name: Build package
+        run: |
+          python -m build
+      
+      - name: Check distribution
+        run: |
+          twine check dist/*
+      
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          twine upload dist/*
+      
+      - name: Push changes and tags
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+          tags: true
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.bump_version.outputs.new_version }}
+          name: Release v${{ steps.bump_version.outputs.new_version }}
+          body: |
+            ## What's Changed
+            
+            Auto-generated release for version ${{ steps.bump_version.outputs.new_version }}
+            
+            ### Installation
+            ```bash
+            pip install --upgrade heartmap
+            
+            # With LIANA support
+            pip install heartmap[communication]
+            ```
+            
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ steps.current_version.outputs.version }}...v${{ steps.bump_version.outputs.new_version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Summary
+        run: |
+          echo "### 🚀 Published to PyPI" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.bump_version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bump Type**: ${{ steps.bump_type.outputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **PyPI**: https://pypi.org/project/heartmap/${{ steps.bump_version.outputs.new_version }}/" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release**: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump_version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY

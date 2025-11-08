@@ -5,15 +5,18 @@ Setup script for HeartMAP package
 from setuptools import setup, find_packages
 from pathlib import Path
 
-# Read README
+# Read README with UTF-8 encoding
 readme_path = Path(__file__).parent / "README.md"
-long_description = readme_path.read_text() if readme_path.exists() else ""
+long_description = ""
+if readme_path.exists():
+    with open(readme_path, encoding='utf-8') as f:
+        long_description = f.read()
 
-# Read version
+# Read version with UTF-8 encoding
 version_path = Path(__file__).parent / "src" / "heartmap" / "__init__.py"
 version = "1.1.0"
 if version_path.exists():
-    with open(version_path) as f:
+    with open(version_path, encoding='utf-8') as f:
         for line in f:
             if line.startswith("__version__"):
                 version = line.split("=")[1].strip().strip('"').strip("'")

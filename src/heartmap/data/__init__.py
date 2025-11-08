@@ -303,9 +303,20 @@ class DataProcessor:
         return adata[cell_indices].copy()
 
 
+# Import ligand-receptor database module
+try:
+    from .lr_database import get_ligand_receptor_pairs, LigandReceptorDatabase
+    LR_DATABASE_AVAILABLE = True
+except ImportError:
+    LR_DATABASE_AVAILABLE = False
+    warnings.warn("Ligand-receptor database module not available. Install liana for full functionality.")
+
 # Export data processing classes
 __all__ = [
     'DataValidator',
     'DataLoader',
-    'DataProcessor'
+    'DataProcessor',
+    'get_ligand_receptor_pairs',
+    'LigandReceptorDatabase',
+    'LR_DATABASE_AVAILABLE'
 ]
