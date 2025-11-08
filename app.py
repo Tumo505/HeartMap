@@ -28,6 +28,8 @@ try:
         MultiChamberPipeline,
         AdvancedCommunicationPipeline
     )
+    from heartmap.data.lr_database import get_ligand_receptor_pairs, LigandReceptorDatabase
+    LR_DATABASE_AVAILABLE = True
     HEARTMAP_AVAILABLE = True
 except ImportError:
     HEARTMAP_AVAILABLE = False
@@ -525,38 +527,72 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
     import networkx as nx
     
     try:
-        # Get cell type information
-        if 'leiden' not in adata.obs.columns:
-            print("No clustering found, skipping network graph")
+        # Detect cluster column (try multiple common names)
+        cluster_col = None
+        for col in ['leiden', 'louvain', 'Cluster', 'cluster', 'cell_type', 'celltype']:
+            if col in adata.obs.columns:
+                cluster_col = col
+                break
+        
+        if cluster_col is None:
+            print("  No clustering column found, skipping network graph")
             return None
         
-        cell_types = adata.obs['leiden'].unique()
+        print(f"  Using clustering column: '{cluster_col}'")
+        cell_types = adata.obs[cluster_col].unique()
         n_types = len(cell_types)
         
-        # Common ligand-receptor pairs in cardiac tissue
-        ligand_receptor_pairs = [
-            ('VEGFA', 'FLT1'), ('VEGFA', 'KDR'),  # Angiogenesis
-            ('TGFB1', 'TGFBR1'), ('TGFB1', 'TGFBR2'),  # TGF-beta signaling
-            ('FGF2', 'FGFR1'), ('FGF2', 'FGFR2'),  # FGF signaling
-            ('IL6', 'IL6R'),  # Inflammation
-            ('TNF', 'TNFRSF1A'), ('TNF', 'TNFRSF1B'),  # TNF signaling
-            ('PDGFA', 'PDGFRA'), ('PDGFB', 'PDGFRB'),  # PDGF signaling
-            ('EGF', 'EGFR'),  # EGF signaling
-            ('IGF1', 'IGF1R'),  # IGF signaling
-            ('CXCL12', 'CXCR4'),  # Chemokine signaling
-            ('CCL2', 'CCR2'),  # Monocyte recruitment
-        ]
+        # Load ligand-receptor pairs from database
+        print("  Loading ligand-receptor database...")
+        if LR_DATABASE_AVAILABLE:
+            try:
+                ligand_receptor_pairs = get_ligand_receptor_pairs(
+                    adata, 
+                    resource='consensus',
+                    confidence_threshold=0.7
+                )
+                print(f"  Loaded {len(ligand_receptor_pairs)} ligand-receptor pairs from database")
+            except Exception as e:
+                print(f"  Warning: Could not load L-R database: {e}")
+                print("  Using minimal fallback pairs")
+                ligand_receptor_pairs = [
+                    ('VEGFA', 'FLT1'), ('VEGFA', 'KDR'),
+                    ('TGFB1', 'TGFBR1'), ('TGFB1', 'TGFBR2'),
+                    ('FGF2', 'FGFR1'), ('IL6', 'IL6R'),
+                    ('TNF', 'TNFRSF1A'), ('CXCL12', 'CXCR4')
+                ]
+        else:
+            print("  L-R database not available, using minimal fallback pairs")
+            ligand_receptor_pairs = [
+                ('VEGFA', 'FLT1'), ('VEGFA', 'KDR'),
+                ('TGFB1', 'TGFBR1'), ('TGFB1', 'TGFBR2'),
+                ('FGF2', 'FGFR1'), ('IL6', 'IL6R'),
+                ('TNF', 'TNFRSF1A'), ('CXCL12', 'CXCR4')
+            ]
         
         # Calculate mean expression per cell type
         print("  Calculating cell type expression profiles...")
         cell_type_expression = {}
         for cell_type in cell_types:
-            cell_mask = adata.obs['leiden'] == cell_type
+            cell_mask = adata.obs[cluster_col] == cell_type
+            # Convert pandas Series to numpy array for scipy sparse matrix indexing
+            cell_mask_array = cell_mask.values if hasattr(cell_mask, 'values') else np.asarray(cell_mask)
+            
             if hasattr(adata.X, 'toarray'):
-                subset_expr = adata.X[cell_mask].toarray()
+                subset_expr = adata.X[cell_mask_array].toarray()
             else:
-                subset_expr = adata.X[cell_mask]
-            cell_type_expression[str(cell_type)] = np.mean(subset_expr, axis=0).A1 if hasattr(subset_expr, 'A1') else np.mean(subset_expr, axis=0)
+                subset_expr = adata.X[cell_mask_array]
+            
+            # Calculate mean and ensure it's a numpy array
+            mean_expr = np.mean(subset_expr, axis=0)
+            if hasattr(mean_expr, 'A1'):
+                mean_expr = mean_expr.A1
+            elif hasattr(mean_expr, 'values'):
+                mean_expr = mean_expr.values
+            
+            # Ensure it's flattened
+            mean_expr = np.asarray(mean_expr).flatten()
+            cell_type_expression[str(cell_type)] = mean_expr
         
         # Create network graph
         G = nx.DiGraph()  # Directed graph for ligand->receptor
@@ -564,8 +600,8 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
         # Add nodes for each cell type with metadata
         node_info = []
         for i, cell_type in enumerate(cell_types):
-            cell_mask = adata.obs['leiden'] == cell_type
-            n_cells = cell_mask.sum()
+            cell_mask = adata.obs[cluster_col] == cell_type
+            n_cells = int(cell_mask.sum())
             
             # Get hub score if available
             hub_score = 0
@@ -609,18 +645,18 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
             
             # Find cell types that express ligand and receptor
             for source_type in cell_types:
-                ligand_expr = cell_type_expression[str(source_type)][ligand_idx]
+                ligand_expr = float(cell_type_expression[str(source_type)][ligand_idx])
                 
                 if ligand_expr > 0.1:  # Threshold for meaningful expression
                     for target_type in cell_types:
                         if source_type == target_type:
                             continue
                         
-                        receptor_expr = cell_type_expression[str(target_type)][receptor_idx]
+                        receptor_expr = float(cell_type_expression[str(target_type)][receptor_idx])
                         
                         if receptor_expr > 0.1:  # Both genes expressed
                             # Calculate interaction strength
-                            strength = np.sqrt(ligand_expr * receptor_expr)
+                            strength = float(np.sqrt(ligand_expr * receptor_expr))
                             
                             edge_key = (str(source_type), str(target_type))
                             edge_info.append({
@@ -791,7 +827,9 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
         return html_path
         
     except Exception as e:
+        import traceback
         print(f"Warning: Could not create network graph: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
         return None
 
 
@@ -1038,11 +1076,22 @@ def analyze_heart_data(
             # ===== COMMUNICATION HUBS =====
             hub_stats = None
             if include_communication_hubs:
+                print("Communication hubs analysis requested...")
+                print(f"  Available metadata columns: {list(analyzed_adata.obs.columns)}")
+                
+                # Detect cluster column (try multiple common names)
+                cluster_col = None
+                for col in ['leiden', 'louvain', 'Cluster', 'cluster', 'cell_type', 'celltype']:
+                    if col in analyzed_adata.obs.columns:
+                        cluster_col = col
+                        print(f"  Using clustering column: '{cluster_col}'")
+                        break
+                
                 # Calculate hub scores (expression diversity + signalling potential)
-                if 'leiden' in analyzed_adata.obs.columns:
+                if cluster_col is not None:
                     hub_scores = []
-                    for cell_type in analyzed_adata.obs['leiden'].unique():
-                        cell_mask = analyzed_adata.obs['leiden'] == cell_type
+                    for cell_type in analyzed_adata.obs[cluster_col].unique():
+                        cell_mask = analyzed_adata.obs[cluster_col] == cell_type
                         
                         # Get expression data and convert sparse to dense if needed
                         X_subset = analyzed_adata[cell_mask].X
@@ -1061,10 +1110,13 @@ def analyze_heart_data(
                         })
 
                     hub_stats = pd.DataFrame(hub_scores).sort_values('Hub Score', ascending=False)
+                    print(f"  ✓ Calculated hub scores for {len(hub_stats)} cell types")
 
                     summary_data['Metric'].append('Top Communication Hub')
                     top_hub = hub_stats.iloc[0]['Cell Type'] if len(hub_stats) > 0 else "N/A"
                     summary_data['Value'].append(top_hub)
+                else:
+                    print("  ⚠ No clustering column found (tried: leiden, louvain, Cluster, cluster, cell_type, celltype)")
 
             summary_df = pd.DataFrame(summary_data)
             summary_df.to_csv(persistent_csv_path, index=False)

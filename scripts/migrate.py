@@ -59,11 +59,6 @@ def migrate_legacy_analysis():
     create_deployment_files(project_root)
     
     print(" Migration completed!")
-    print("\nNext steps:")
-    print("1. Install the new package: pip install -e .[all]")
-    print("2. Run tests: python tests/test_heartmap.py")
-    print("3. Try examples: python scripts/run_examples.py")
-    print("4. Check notebooks in: notebooks/")
 
 
 def create_migration_notebooks(notebooks_dir):

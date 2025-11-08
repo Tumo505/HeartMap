@@ -4,9 +4,11 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![CI Status](https://github.com/Tumo505/HeartMap/workflows/CI/badge.svg)](https://github.com/Tumo505/HeartMap/actions)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17512107.svg)](https://doi.org/10.5281/zenodo.17512107)
+[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.csbj.2025.11.015-blue)](https://doi.org/10.1016/j.csbj.2025.11.015)
 
 > **A production-ready Python package for comprehensive single-cell heart analysis with chamber-specific insights**
+
+**📰 Published in Computational and Structural Biotechnology Journal (2025)** | [Read the paper](https://www.sciencedirect.com/science/article/pii/S2001037025004866)
 
 ## Package Overview
 
@@ -143,19 +145,24 @@ The package is production-ready and maintained. See the [User Guide](USER_GUIDE.
 - **Storage**: 2GB+ for package and results
 - **OS**: Linux, macOS, Windows
 
-## Contributing
-
-We welcome contributions! See our [development documentation](README_ORIGINAL.md) for details.
 
 ## Citation
 
+If you use HeartMAP in your research, please cite our paper:
+
+**Kgabeng, T., Wang, L., Ngwangwa, H., & Pandelani, T. (2025).** HeartMAP: A Multi-Chamber Spatial Framework for Cardiac Cell-Cell Communication. Computational and Structural Biotechnology Journal. https://doi.org/10.1016/J.CSBJ.2025.11.015
+
 ```bibtex
-@software{heartmap2025,
-  title={HeartMAP: Heart Multi-chamber Analysis Platform},
-  author={Kgabeng, Tumo and Wang, Lulu and Ngwangwa, Harry and Pandelani, Thanyani},
-  year={2025},
-  url={https://github.com/Tumo505/HeartMap},
-  version={1.0.0}
+@article{KGABENG2025,
+title = {HeartMAP: A Multi-Chamber Spatial Framework for Cardiac Cell-Cell Communication},
+journal = {Computational and Structural Biotechnology Journal},
+year = {2025},
+issn = {2001-0370},
+doi = {https://doi.org/10.1016/j.csbj.2025.11.015},
+url = {https://www.sciencedirect.com/science/article/pii/S2001037025004866},
+author = {Tumo Kgabeng and Lulu Wang and Harry Ngwangwa and Thanyani Pandelani},
+keywords = {single-cell RNA-seq, cell-cell communication, cardiac chambers, spatial transcriptomics, therapeutic targets},
+abstract = {Understanding cell-cell communication within and between the four distinct cardiac chambers is fundamental to elucidating cardiac function and disease mechanisms. Each chamber exhibits unique cellular and molecular characteristics that reflect specialised physiological roles, yet existing frameworks for mapping chamber-specific intercellular networks have remained limited. Here, we present HeartMAP (Heart Multi-chamber Analysis Platform), a computational framework that infers cardiac cell-cell communication networks at chamber resolution through integration of single-cell RNA-seq co-expression patterns and ligand-receptor interaction databases. Using a dataset of 287,269 cells from seven healthy human heart donors (Single Cell Portal SCP498), we identified chamber-specific cell populations, communication networks, and therapeutic targets. HeartMAP employs a progressive three-tier analytical approach comprising basic pipeline analysis, advanced communication modelling and multi-chamber atlas construction to reveal both conserved and chamber-specific signalling pathways; cross-chamber correlation analysis demonstrated the highest similarity between ventricles (r = 0.985) and the lowest between left atrium and left ventricle (r = 0.870), reflecting functional specialisation. Communication hub analysis identified atrial cardiomyocytes and adipocytes as key signalling centres with hub scores of 0.037 to 0.047, while differential expression analysis revealed over 150 significantly different genes per chamber pair. These findings establish a molecular foundation for precision cardiology approaches, enabling chamber-specific therapeutic strategies that could improve treatment outcomes for cardiovascular diseases. HeartMAP is freely available as a Python package than can be installed using “pip install heartmap”, the package’s documentation can be found on https://pypi.org/project/heartmap/, it can also be accessed via a user-friendly web interface freely available at https://huggingface.co/spaces/Tumo505/heartmap-cell-analysis.}
 }
 ```
 
@@ -399,7 +406,7 @@ paths:
 | 32GB       | 50,000          | 5,000           | Server |
 | 64GB+      | 100,000+        | 10,000+         | HPC/Cloud |
 
-## 🔬 Analysis Components
+## Analysis Components
 
 ### 1. Basic Pipeline
 - **Data Preprocessing**: Quality control, normalization, scaling
@@ -740,18 +747,7 @@ model:
 
 Ssee the [LICENSE](LICENSE) file for details.
 
-## Citation
 
-```bibtex
-@software{heartmap2025,
-  title={HeartMAP: A Multi-Chamber Spatial Framework for Cardiac Cell-Cell Communication},
-  author={Kgabeng, Tumo and Wang, Lulu and Ngwangwa, Harry and Pandelani, Thanyani},
-  year={2025},
-  url={https://github.com/Tumo505/HeartMap},
-  version={1.0.0},
-  doi={10.5281/zenodo.16745118}
-}
-```
 
 ## Support
 
