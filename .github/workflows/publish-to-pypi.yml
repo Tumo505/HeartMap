@@ -70,7 +70,8 @@ jobs:
       - name: Get current version
         id: current_version
         run: |
-          CURRENT_VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from heartmap import __version__; print(__version__)")
+          # Read version directly from file without importing
+          CURRENT_VERSION=$(grep -oP '__version__\s*=\s*"\K[^"]+' src/heartmap/__init__.py)
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
       
@@ -104,8 +105,8 @@ jobs:
             --no-tag \
             src/heartmap/__init__.py
           
-          # Get new version
-          NEW_VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from heartmap import __version__; print(__version__)")
+          # Get new version (read directly from file)
+          NEW_VERSION=$(grep -oP '__version__\s*=\s*"\K[^"]+' src/heartmap/__init__.py)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
       

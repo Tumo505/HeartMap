@@ -3,6 +3,7 @@ data/raw/
 data/processed/
 data/intermediate/
 data/cache/
+data/validation/
 
 # Large data files (single-cell, genomics, etc.)
 *.h5ad

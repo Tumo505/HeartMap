@@ -31,7 +31,10 @@ try:
     from heartmap.data.lr_database import get_ligand_receptor_pairs, LigandReceptorDatabase
     LR_DATABASE_AVAILABLE = True
     HEARTMAP_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    print(f"ImportError: {e}")
+    import traceback
+    traceback.print_exc()
     HEARTMAP_AVAILABLE = False
 
 def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
