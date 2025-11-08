@@ -29,8 +29,7 @@ class DataValidator:
         return sha256_hash.hexdigest() == expected_checksum
 
     @staticmethod
-    def validate_anndata(adata: ad.AnnData,
-                         check_qc_metrics: bool = True) -> Tuple[bool, List[str]]:
+    def validate_anndata(adata: ad.AnnData, check_qc_metrics: bool = True) -> Tuple[bool, List[str]]:
         """Validate AnnData object structure"""
         issues = []
 
@@ -221,9 +220,7 @@ class DataProcessor:
             pass
         return adata
 
-    def process_from_raw(self,
-                         file_path: str,
-                         save_intermediate: bool = True) -> ad.AnnData:
+    def process_from_raw(self, file_path: str, save_intermediate: bool = True) -> ad.AnnData:
         """Complete processing pipeline from raw data"""
 
         # Ensure processed data directory exists

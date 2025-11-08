@@ -4,9 +4,7 @@ Uses LIANA's curated resources (consensus, CellPhoneDB, Omnipath, etc.)
 """
 
 import pandas as pd
-import numpy as np
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import List, Tuple, Optional
 
 # Try importing LIANA
 try:

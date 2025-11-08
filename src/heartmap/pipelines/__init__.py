@@ -87,7 +87,7 @@ class BasicPipeline(BasePipeline):
 
             # UMAP plot
             sc.pl.umap(adata, color=['leiden'], legend_loc='on data',
-                       title='Cell Type Clusters', show=False)
+                        title='Cell Type Clusters', show=False)
             plt.savefig(viz_dir / "umap_clusters.png", dpi=300, bbox_inches='tight')
             plt.close()
 
@@ -142,13 +142,13 @@ class AdvancedCommunicationPipeline(BasePipeline):
                 cluster_col = col
                 print(f"   Using clustering column: '{cluster_col}'")
                 break
-        
+
         if cluster_col is None:
             raise ValueError("Input data must have cell type annotations (leiden/Cluster/cell_type column)")
 
         # Communication analysis with L-R database
         print("2. Analyzing cell-cell communication...")
-        
+
         if self.lr_available:
             print("   Loading ligand-receptor database...")
             try:
@@ -158,7 +158,7 @@ class AdvancedCommunicationPipeline(BasePipeline):
                     confidence_threshold=0.7
                 )
                 print(f"   Loaded {len(ligand_receptor_pairs)} L-R pairs from database")
-                
+
                 # Calculate communication scores based on L-R co-expression
                 communication_scores = self._calculate_lr_communication(
                     adata, cluster_col, ligand_receptor_pairs
@@ -173,7 +173,7 @@ class AdvancedCommunicationPipeline(BasePipeline):
 
         # Calculate hub scores
         hub_scores = self._calculate_hub_scores(adata, cluster_col)
-        
+
         # Pathway analysis (placeholder for now)
         pathway_scores = pd.DataFrame()
 
@@ -212,49 +212,49 @@ class AdvancedCommunicationPipeline(BasePipeline):
 
         print("Advanced communication pipeline completed!")
         return self.results
-    
+
     def _calculate_lr_communication(self, adata, cluster_col, ligand_receptor_pairs):
         """Calculate communication scores based on ligand-receptor co-expression"""
         cell_types = adata.obs[cluster_col].unique()
-        
+
         # Calculate mean expression per cell type
         cell_type_expression = {}
         for cell_type in cell_types:
             cell_mask = adata.obs[cluster_col] == cell_type
             cell_mask_array = cell_mask.values if hasattr(cell_mask, 'values') else np.asarray(cell_mask)
-            
+
             if hasattr(adata.X, 'toarray'):
                 subset_expr = adata.X[cell_mask_array].toarray()
             else:
                 subset_expr = adata.X[cell_mask_array]
-            
+
             mean_expr = np.mean(subset_expr, axis=0)
             if hasattr(mean_expr, 'A1'):
                 mean_expr = mean_expr.A1
             elif hasattr(mean_expr, 'values'):
                 mean_expr = mean_expr.values
-            
+
             cell_type_expression[str(cell_type)] = np.asarray(mean_expr).flatten()
-        
+
         # Calculate communication scores
         communication_data = []
         for ligand, receptor in ligand_receptor_pairs:
             if ligand not in adata.var_names or receptor not in adata.var_names:
                 continue
-            
+
             ligand_idx = list(adata.var_names).index(ligand)
             receptor_idx = list(adata.var_names).index(receptor)
-            
+
             for source_type in cell_types:
                 ligand_expr = float(cell_type_expression[str(source_type)][ligand_idx])
-                
+
                 if ligand_expr > 0.1:
                     for target_type in cell_types:
                         if source_type == target_type:
                             continue
-                        
+
                         receptor_expr = float(cell_type_expression[str(target_type)][receptor_idx])
-                        
+
                         if receptor_expr > 0.1:
                             strength = float(np.sqrt(ligand_expr * receptor_expr))
                             communication_data.append({
@@ -264,14 +264,14 @@ class AdvancedCommunicationPipeline(BasePipeline):
                                 'receptor': receptor,
                                 'communication_score': strength
                             })
-        
+
         return pd.DataFrame(communication_data)
-    
+
     def _basic_communication_analysis(self, adata, cluster_col):
         """Fallback basic communication analysis"""
         cell_types = adata.obs[cluster_col].unique()
         communication_data = []
-        
+
         for source in cell_types:
             for target in cell_types:
                 if source != target:
@@ -280,30 +280,30 @@ class AdvancedCommunicationPipeline(BasePipeline):
                         'target': str(target),
                         'communication_score': np.random.uniform(0.1, 0.9)
                     })
-        
+
         return pd.DataFrame(communication_data)
-    
+
     def _calculate_hub_scores(self, adata, cluster_col):
         """Calculate hub scores per cell type"""
         hub_scores = []
-        
+
         for cell_type in adata.obs[cluster_col].unique():
             cell_mask = adata.obs[cluster_col] == cell_type
             cell_mask_array = cell_mask.values if hasattr(cell_mask, 'values') else np.asarray(cell_mask)
-            
+
             X_subset = adata.X[cell_mask_array]
             if hasattr(X_subset, 'toarray'):
                 X_subset = X_subset.toarray()
-            
+
             expr_mean = np.mean(X_subset)
             expr_std = np.std(X_subset)
             expr_var = np.var(X_subset)
-            
+
             hub_score = (expr_std * expr_mean) / (expr_var + 1) if expr_var > 0 else 0
-            
+
             for _ in range(int(cell_mask.sum())):
                 hub_scores.append(float(hub_score))
-        
+
         return pd.Series(hub_scores, index=adata.obs.index)
 
 
