@@ -5,7 +5,7 @@ A comprehensive framework for analyzing cell-cell communication across all four 
 of the human heart using single-cell RNA sequencing data.
 """
 
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 __author__ = "Tumo Kgabeng, Lulu Wang, Harry Ngwangwa, Thanyani Pandelani"
 __email__ = "28346416@mylife.unisa.ac.za"
 
