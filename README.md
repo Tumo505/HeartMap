@@ -3,7 +3,6 @@
 [![PyPI version](https://badge.fury.io/py/heartmap.svg)](https://badge.fury.io/py/heartmap)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![CI Status](https://github.com/Tumo505/HeartMap/workflows/CI/badge.svg)](https://github.com/Tumo505/HeartMap/actions)
 [![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.csbj.2025.11.015-blue)](https://doi.org/10.1016/j.csbj.2025.11.015)
 
 > **A production-ready Python package for comprehensive single-cell heart analysis with chamber-specific insights**
