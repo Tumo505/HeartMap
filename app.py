@@ -952,19 +952,45 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
             )
             node_traces.append(node_trace)
         
+        # Store edge information for click interactions (JSON format for JavaScript)
+        import json
+        edge_data_for_js = []
+        for edge in G.edges(data=True):
+            interactions = edge[2].get('interactions', [])
+            edge_data_for_js.append({
+                'source': edge[0],
+                'target': edge[1],
+                'weight': float(edge[2].get('weight', 0)),
+                'interactions': interactions,
+                'source_pos': list(pos[edge[0]]),
+                'target_pos': list(pos[edge[1]])
+            })
+        
+        # Store node information for highlighting
+        node_data_for_js = []
+        for node_data in node_info:
+            if node_data['id'] in pos:
+                node_data_for_js.append({
+                    'id': node_data['id'],
+                    'label': node_data['label'],
+                    'pos': list(pos[node_data['id']]),
+                    'connected_to': [str(t) for t in G.successors(node_data['id'])],
+                    'connected_from': [str(s) for s in G.predecessors(node_data['id'])]
+                })
+        
         # Create figure with all traces
         fig = go.Figure(data=edge_traces + node_traces)
         
         fig.update_layout(
             title={
-                'text': "Cell-Cell Communication Network<br><sub>Inferred from Ligand-Receptor Gene Expression</sub>",
+                'text': "Interactive Cell-Cell Communication Network<br><sub>Click nodes to highlight connections | Click edges to see L-R pairs</sub>",
                 'x': 0.5,
                 'xanchor': 'center',
                 'font': {'size': 20}
             },
             showlegend=True,
             legend=dict(
-                title="Cell Types",
+                title="Cell Types (click to toggle)",
                 orientation="v",
                 yanchor="top",
                 y=1,
@@ -982,7 +1008,7 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
             annotations=[
                 dict(
-                    text="Arrows show cell-cell communication via ligand-receptor pairs | Node size = cell count | Edge width = interaction strength",
+                    text="🖱️ Click cluster to see detailed view with all incoming/outgoing communications | 🖱️ Click edge to see L-R pairs",
                     showarrow=False,
                     xref="paper", yref="paper",
                     x=0.5, y=-0.02,
@@ -990,11 +1016,14 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
                     font=dict(size=11, color='gray')
                 )
             ],
-            margin=dict(l=20, r=250, t=80, b=40)
+            margin=dict(l=20, r=250, t=80, b=40),
+            clickmode='event+select'
         )
         
-        # Save as HTML
+        # Save as HTML with custom JavaScript for interactivity
         html_path = tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False).name
+        
+        # Generate base HTML
         fig.write_html(
             html_path,
             include_plotlyjs='cdn',
@@ -1011,6 +1040,450 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
             }
         )
         
+        # Add custom JavaScript for node/edge interactivity
+        with open(html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # Inject JavaScript before </body>
+        # Use triple quotes and escape only what's needed
+        edge_data_json = json.dumps(edge_data_for_js)
+        node_data_json = json.dumps(node_data_for_js)
+        
+        custom_js = '''
+<script>
+// Store edge and node data
+const edgeData = ''' + edge_data_json + ''';
+const nodeData = ''' + node_data_json + ''';
+let selectedNode = null;
+let expandedEdges = new Set();
+
+// Add click event listener to the plot
+document.addEventListener('DOMContentLoaded', function() {
+    const plotDiv = document.querySelector('.plotly-graph-div');
+    if (!plotDiv) {
+        console.error('Plotly graph div not found');
+        return;
+    }
+    
+    console.log('Setting up click handler. Edges:', edgeData.length, 'Nodes:', nodeData.length);
+    
+    plotDiv.on('plotly_click', function(data) {
+        const point = data.points[0];
+        console.log('Click detected - curveNumber:', point.curveNumber, 'pointNumber:', point.pointNumber);
+        
+        // Check if clicked on a node (nodes come after edges)
+        const isNode = point.curveNumber >= edgeData.length;
+        
+        if (isNode) {
+            console.log('Node clicked');
+            // Node clicked - highlight connections
+            handleNodeClick(point);
+        } else {
+            console.log('Edge clicked');
+            // Edge clicked - show L-R pairs
+            handleEdgeClick(point);
+        }
+    });
+});
+
+function handleNodeClick(point) {
+    const clickedLabel = point.data.name;
+    console.log('Node click handler - label:', clickedLabel, 'point:', point);
+    
+    // Find the node data
+    const node = nodeData.find(n => n.label === clickedLabel);
+    if (!node) {
+        console.error('Could not find node with label:', clickedLabel);
+        console.log('Available nodes:', nodeData.map(n => n.label));
+        return;
+    }
+    
+    console.log('Found node data:', node);
+    
+    // Show detailed cluster view with communications
+    showClusterDetailView(node);
+    
+    // Also highlight connections in main network
+    selectedNode = node.id;
+    highlightNodeConnections(node);
+}
+
+function showClusterDetailView(node) {
+    // Create detail window/modal showing cluster information
+    let detailWindow = document.getElementById('cluster-detail-window');
+    if (!detailWindow) {
+        detailWindow = document.createElement('div');
+        detailWindow.id = 'cluster-detail-window';
+        detailWindow.style.cssText = 
+            'position: fixed;' +
+            'top: 50px;' +
+            'left: 50%;' +
+            'transform: translateX(-50%);' +
+            'background: white;' +
+            'border: 3px solid #667eea;' +
+            'border-radius: 12px;' +
+            'padding: 0;' +
+            'width: 80%;' +
+            'max-width: 900px;' +
+            'max-height: 85vh;' +
+            'overflow-y: auto;' +
+            'box-shadow: 0 8px 32px rgba(0,0,0,0.3);' +
+            'z-index: 10001;' +
+            'font-family: Arial, sans-serif;';
+        document.body.appendChild(detailWindow);
+    }
+    
+    // Get incoming and outgoing communications for this cluster
+    const incomingComms = edgeData.filter(e => e.target === node.id);
+    const outgoingComms = edgeData.filter(e => e.source === node.id);
+    
+    // Create incoming communications HTML
+    let incomingHTML = '';
+    if (incomingComms.length > 0) {
+        incomingHTML = '<div style="margin-top: 15px;"><h4 style="color: #28a745; margin: 10px 0;">📥 Receiving Signals From:</h4>';
+        incomingComms.forEach(comm => {
+            incomingHTML += 
+                '<div style="background: #f0f8f0; padding: 12px; margin: 8px 0; border-radius: 6px; border-left: 4px solid #28a745;">' +
+                '<strong style="color: #28a745;">From ' + comm.source + '</strong>' +
+                '<div style="margin-top: 5px; font-size: 13px;">Strength: ' + comm.weight.toFixed(3) + '</div>' +
+                '<div style="margin-top: 5px;"><strong>L-R Pairs (' + comm.interactions.length + '):</strong></div>' +
+                '<ul style="margin: 5px 0; padding-left: 20px; font-size: 12px;">';
+            comm.interactions.forEach(pair => {
+                incomingHTML += '<li>' + pair + '</li>';
+            });
+            incomingHTML += '</ul></div>';
+        });
+        incomingHTML += '</div>';
+    }
+    
+    // Create outgoing communications HTML
+    let outgoingHTML = '';
+    if (outgoingComms.length > 0) {
+        outgoingHTML = '<div style="margin-top: 15px;"><h4 style="color: #dc3545; margin: 10px 0;">📤 Sending Signals To:</h4>';
+        outgoingComms.forEach(comm => {
+            outgoingHTML += 
+                '<div style="background: #fff0f0; padding: 12px; margin: 8px 0; border-radius: 6px; border-left: 4px solid #dc3545;">' +
+                '<strong style="color: #dc3545;">To ' + comm.target + '</strong>' +
+                '<div style="margin-top: 5px; font-size: 13px;">Strength: ' + comm.weight.toFixed(3) + '</div>' +
+                '<div style="margin-top: 5px;"><strong>L-R Pairs (' + comm.interactions.length + '):</strong></div>' +
+                '<ul style="margin: 5px 0; padding-left: 20px; font-size: 12px;">';
+            comm.interactions.forEach(pair => {
+                outgoingHTML += '<li>' + pair + '</li>';
+            });
+            outgoingHTML += '</ul></div>';
+        });
+        outgoingHTML += '</div>';
+    }
+    
+    // Generate communication network visualization for this cluster
+    const clusterNetworkHTML = generateClusterNetworkSVG(node, incomingComms, outgoingComms);
+    
+    detailWindow.innerHTML = 
+        '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0;">' +
+        '<h2 style="margin: 0;">🔬 ' + node.label + ' - Detailed View</h2>' +
+        '<p style="margin: 5px 0 0 0; opacity: 0.9;">Communication patterns and cell information</p>' +
+        '</div>' +
+        '<div style="padding: 20px;">' +
+        '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">' +
+        '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;">' +
+        '<div style="font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 5px;">Connected To</div>' +
+        '<div style="font-size: 24px; font-weight: bold; color: #333;">' + node.connected_to.length + ' clusters</div>' +
+        '</div>' +
+        '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #764ba2;">' +
+        '<div style="font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 5px;">Receives From</div>' +
+        '<div style="font-size: 24px; font-weight: bold; color: #333;">' + node.connected_from.length + ' clusters</div>' +
+        '</div>' +
+        '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">' +
+        '<div style="font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 5px;">Total Communications</div>' +
+        '<div style="font-size: 24px; font-weight: bold; color: #333;">' + (incomingComms.length + outgoingComms.length) + '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">' +
+        '<h3 style="margin: 0 0 15px 0; color: #667eea;">📊 Communication Network</h3>' +
+        clusterNetworkHTML +
+        '</div>' +
+        outgoingHTML +
+        incomingHTML +
+        '<div style="margin-top: 20px; text-align: center;">' +
+        '<button onclick="document.getElementById(\'cluster-detail-window\').style.display=\'none\'; resetEdgeStyles();" style="' +
+        'padding: 10px 30px;' +
+        'background: #667eea;' +
+        'color: white;' +
+        'border: none;' +
+        'border-radius: 6px;' +
+        'cursor: pointer;' +
+        'font-size: 16px;' +
+        'font-weight: bold;' +
+        '">Close</button>' +
+        '</div>' +
+        '</div>';
+    
+    detailWindow.style.display = 'block';
+}
+
+function generateClusterNetworkSVG(centerNode, incoming, outgoing) {
+    // Create a simple SVG visualization of the cluster's connections
+    const svgWidth = 800;
+    const svgHeight = 400;
+    const centerX = svgWidth / 2;
+    const centerY = svgHeight / 2;
+    const radius = 120;
+    
+    let svg = '<svg width="' + svgWidth + '" height="' + svgHeight + '" style="background: white; border-radius: 8px;">';
+    
+    // Draw center node (the selected cluster)
+    svg += '<circle cx="' + centerX + '" cy="' + centerY + '" r="40" fill="#667eea" stroke="#764ba2" stroke-width="3"/>';
+    svg += '<text x="' + centerX + '" y="' + (centerY + 5) + '" text-anchor="middle" fill="white" font-weight="bold" font-size="14">' + centerNode.id + '</text>';
+    
+    // Draw incoming connections (on the left)
+    const incomingAngleStep = incoming.length > 1 ? Math.PI / (incoming.length + 1) : Math.PI / 2;
+    incoming.forEach((comm, i) => {
+        const angle = Math.PI - (i + 1) * incomingAngleStep;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+        
+        // Draw edge
+        svg += '<line x1="' + x + '" y1="' + y + '" x2="' + (centerX - 40) + '" y2="' + centerY + '" stroke="#28a745" stroke-width="2" marker-end="url(#arrowgreen)"/>';
+        
+        // Draw node
+        svg += '<circle cx="' + x + '" cy="' + y + '" r="25" fill="#28a745" stroke="white" stroke-width="2"/>';
+        svg += '<text x="' + x + '" y="' + (y + 4) + '" text-anchor="middle" fill="white" font-size="11" font-weight="bold">' + comm.source + '</text>';
+    });
+    
+    // Draw outgoing connections (on the right)
+    const outgoingAngleStep = outgoing.length > 1 ? Math.PI / (outgoing.length + 1) : Math.PI / 2;
+    outgoing.forEach((comm, i) => {
+        const angle = (i + 1) * outgoingAngleStep;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+        
+        // Draw edge
+        svg += '<line x1="' + (centerX + 40) + '" y1="' + centerY + '" x2="' + x + '" y2="' + y + '" stroke="#dc3545" stroke-width="2" marker-end="url(#arrowred)"/>';
+        
+        // Draw node
+        svg += '<circle cx="' + x + '" cy="' + y + '" r="25" fill="#dc3545" stroke="white" stroke-width="2"/>';
+        svg += '<text x="' + x + '" y="' + (y + 4) + '" text-anchor="middle" fill="white" font-size="11" font-weight="bold">' + comm.target + '</text>';
+    });
+    
+    // Add arrow markers
+    svg += '<defs>' +
+        '<marker id="arrowgreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">' +
+        '<path d="M0,0 L0,6 L9,3 z" fill="#28a745" />' +
+        '</marker>' +
+        '<marker id="arrowred" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">' +
+        '<path d="M0,0 L0,6 L9,3 z" fill="#dc3545" />' +
+        '</marker>' +
+        '</defs>';
+    
+    svg += '</svg>';
+    return svg;
+}
+
+function highlightNodeConnections(node) {
+    // Get connected edge indices
+    const connectedEdgeIndices = [];
+    edgeData.forEach((edge, idx) => {
+        if (edge.source === node.id || edge.target === node.id) {
+            connectedEdgeIndices.push(idx);
+        }
+    });
+    
+    console.log('Highlighting connections for node:', node.id, 'Connected edges:', connectedEdgeIndices);
+    
+    // Dim all edges except connected ones
+    const plotDiv = document.querySelector('.plotly-graph-div');
+    
+    try {
+        // Prepare arrays for batch update
+        const traceIndices = [];
+        const lineColors = [];
+        const lineWidths = [];
+        
+        edgeData.forEach((edge, idx) => {
+            const isConnected = connectedEdgeIndices.includes(idx);
+            
+            traceIndices.push(idx);
+            lineColors.push(isConnected ? 
+                'rgba(255, 100, 100, 0.8)' :  // Highlight connected
+                'rgba(150, 150, 150, 0.2)');   // Dim others
+            lineWidths.push(isConnected ?
+                Math.max(3, edge.weight * 4) :  // Thicker connected
+                Math.max(0.5, edge.weight * 1)); // Thinner others
+        });
+        
+        // Batch update all edge traces
+        Plotly.restyle(plotDiv, {
+            'line.color': lineColors,
+            'line.width': lineWidths
+        }, traceIndices);
+        
+        console.log('Edge highlighting applied successfully');
+    } catch (error) {
+        console.error('Error highlighting edges:', error);
+    }
+    
+    // Show info box
+    showNodeInfo(node);
+}
+
+function resetEdgeStyles() {
+    const plotDiv = document.querySelector('.plotly-graph-div');
+    
+    console.log('Resetting edge styles');
+    
+    try {
+        // Prepare arrays for batch reset
+        const traceIndices = [];
+        const lineColors = [];
+        const lineWidths = [];
+        
+        edgeData.forEach((edge, idx) => {
+            traceIndices.push(idx);
+            lineColors.push('rgba(150, 150, 150, 0.5)');
+            lineWidths.push(Math.max(0.5, Math.min(5, edge.weight * 2)));
+        });
+        
+        // Batch reset all edge traces
+        Plotly.restyle(plotDiv, {
+            'line.color': lineColors,
+            'line.width': lineWidths
+        }, traceIndices);
+        
+        console.log('Edge styles reset successfully');
+    } catch (error) {
+        console.error('Error resetting edges:', error);
+    }
+    
+    hideInfoBox();
+}
+
+function handleEdgeClick(point) {
+    const edgeIdx = point.curveNumber;
+    console.log('Edge click handler - index:', edgeIdx, 'Total edges:', edgeData.length);
+    
+    const edge = edgeData[edgeIdx];
+    
+    if (!edge) {
+        console.error('No edge data found for index:', edgeIdx);
+        return;
+    }
+    
+    console.log('Edge clicked:', edge);
+    
+    // Show detailed L-R pair information
+    showEdgeDetails(edge);
+}
+
+function showNodeInfo(node) {
+    // Create or update info box
+    let infoBox = document.getElementById('network-info-box');
+    if (!infoBox) {
+        infoBox = document.createElement('div');
+        infoBox.id = 'network-info-box';
+        infoBox.style.cssText = 
+            'position: fixed;' +
+            'top: 100px;' +
+            'right: 20px;' +
+            'background: white;' +
+            'border: 2px solid #4CAF50;' +
+            'border-radius: 8px;' +
+            'padding: 15px;' +
+            'max-width: 300px;' +
+            'box-shadow: 0 4px 8px rgba(0,0,0,0.2);' +
+            'z-index: 10000;' +
+            'font-family: Arial, sans-serif;';
+        document.body.appendChild(infoBox);
+    }
+    
+    const connectedTo = node.connected_to.join(', ') || 'None';
+    const connectedFrom = node.connected_from.join(', ') || 'None';
+    
+    infoBox.innerHTML = 
+        '<h3 style="margin: 0 0 10px 0; color: #4CAF50;">' +
+        '🔍 ' + node.label +
+        '</h3>' +
+        '<p style="margin: 5px 0;"><strong>Signals TO:</strong><br>' +
+        '<span style="font-size: 12px;">' + connectedTo + '</span></p>' +
+        '<p style="margin: 5px 0;"><strong>Receives FROM:</strong><br>' +
+        '<span style="font-size: 12px;">' + connectedFrom + '</span></p>' +
+        '<button onclick="resetEdgeStyles()" style="' +
+        'margin-top: 10px;' +
+        'padding: 5px 10px;' +
+        'background: #f44336;' +
+        'color: white;' +
+        'border: none;' +
+        'border-radius: 4px;' +
+        'cursor: pointer;' +
+        '">Clear Highlight</button>';
+    
+    infoBox.style.display = 'block';
+}
+
+function showEdgeDetails(edge) {
+    // Create or update detail box
+    let detailBox = document.getElementById('edge-detail-box');
+    if (!detailBox) {
+        detailBox = document.createElement('div');
+        detailBox.id = 'edge-detail-box';
+        detailBox.style.cssText = 
+            'position: fixed;' +
+            'top: 100px;' +
+            'left: 20px;' +
+            'background: white;' +
+            'border: 2px solid #2196F3;' +
+            'border-radius: 8px;' +
+            'padding: 15px;' +
+            'max-width: 400px;' +
+            'max-height: 500px;' +
+            'overflow-y: auto;' +
+            'box-shadow: 0 4px 8px rgba(0,0,0,0.2);' +
+            'z-index: 10000;' +
+            'font-family: Arial, sans-serif;';
+        document.body.appendChild(detailBox);
+    }
+    
+    const interactionList = edge.interactions.map(pair => 
+        '<li style="margin: 5px 0; font-size: 13px;">📡 ' + pair + '</li>'
+    ).join('');
+    
+    detailBox.innerHTML = 
+        '<h3 style="margin: 0 0 10px 0; color: #2196F3;">' +
+        edge.source + ' ➡ ' + edge.target +
+        '</h3>' +
+        '<p style="margin: 5px 0;"><strong>Interaction Strength:</strong> ' + edge.weight.toFixed(3) + '</p>' +
+        '<p style="margin: 5px 0;"><strong>Ligand-Receptor Pairs (' + edge.interactions.length + '):</strong></p>' +
+        '<ul style="margin: 5px 0; padding-left: 20px;">' +
+        interactionList +
+        '</ul>' +
+        '<button onclick="document.getElementById(\'edge-detail-box\').style.display=\'none\'" style="' +
+        'margin-top: 10px;' +
+        'padding: 5px 10px;' +
+        'background: #f44336;' +
+        'color: white;' +
+        'border: none;' +
+        'border-radius: 4px;' +
+        'cursor: pointer;' +
+        '">Close</button>';
+    
+    detailBox.style.display = 'block';
+}
+
+function hideInfoBox() {
+    const infoBox = document.getElementById('network-info-box');
+    if (infoBox) {
+        infoBox.style.display = 'none';
+    }
+}
+</script>
+'''
+        
+        # Insert JavaScript before </body>
+        html_content = html_content.replace('</body>', custom_js + '</body>')
+        
+        # Write back
+        with open(html_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
         print(f"✓ Created interactive communication network: {html_path}")
         return html_path
         
@@ -1018,6 +1491,234 @@ def create_communication_network(adata, hub_stats, chamber_stats=None):
         import traceback
         print(f"Warning: Could not create network graph: {e}")
         print(f"Traceback: {traceback.format_exc()}")
+        return None
+
+
+def create_cluster_detail_view(adata, cluster_id, cluster_col='leiden'):
+    """
+    Create detailed view of a specific cluster showing:
+    1. Cell type composition and statistics
+    2. Sub-network of cells within that cluster
+    3. Communication patterns (incoming/outgoing)
+    
+    Args:
+        adata: AnnData object
+        cluster_id: The cluster ID to analyze
+        cluster_col: Column name containing cluster assignments
+        
+    Returns:
+        Dictionary with cluster details and HTML visualizations
+    """
+    import networkx as nx
+    
+    try:
+        # Get cells in this cluster
+        cluster_mask = adata.obs[cluster_col] == cluster_id
+        cluster_adata = adata[cluster_mask].copy()
+        n_cells = cluster_adata.n_obs
+        
+        # Calculate cluster statistics
+        stats = {
+            'cluster_id': str(cluster_id),
+            'n_cells': int(n_cells),
+            'n_genes': int(cluster_adata.n_vars),
+            'total_counts_mean': float(np.mean(cluster_adata.obs.get('total_counts', [0]))),
+            'n_genes_by_counts_mean': float(np.mean(cluster_adata.obs.get('n_genes_by_counts', [0]))),
+        }
+        
+        # Get chamber distribution if available
+        if 'chamber' in cluster_adata.obs.columns:
+            chamber_counts = cluster_adata.obs['chamber'].value_counts()
+            stats['chamber_distribution'] = chamber_counts.to_dict()
+        
+        # Get top expressed genes in this cluster
+        if hasattr(cluster_adata.X, 'toarray'):
+            mean_expr = np.mean(cluster_adata.X.toarray(), axis=0)
+        else:
+            mean_expr = np.mean(cluster_adata.X, axis=0)
+        
+        if hasattr(mean_expr, 'A1'):
+            mean_expr = mean_expr.A1
+        mean_expr = np.asarray(mean_expr).flatten()
+        
+        top_gene_indices = np.argsort(mean_expr)[-20:][::-1]
+        top_genes = [(str(cluster_adata.var_names[i]), float(mean_expr[i])) 
+                     for i in top_gene_indices]
+        stats['top_genes'] = top_genes
+        
+        # Create HTML visualization
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Cluster {cluster_id} Details</title>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    padding: 20px;
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    background: #f5f5f5;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    margin-bottom: 20px;
+                }}
+                .stats-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                    gap: 20px;
+                    margin-bottom: 20px;
+                }}
+                .stat-card {{
+                    background: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                .stat-card h3 {{
+                    margin: 0 0 10px 0;
+                    color: #667eea;
+                    font-size: 14px;
+                    text-transform: uppercase;
+                }}
+                .stat-card .value {{
+                    font-size: 32px;
+                    font-weight: bold;
+                    color: #333;
+                }}
+                .section {{
+                    background: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    margin-bottom: 20px;
+                }}
+                .gene-list {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 10px;
+                }}
+                .gene-item {{
+                    padding: 10px;
+                    background: #f8f9fa;
+                    border-radius: 4px;
+                    border-left: 3px solid #667eea;
+                }}
+                .gene-name {{
+                    font-weight: bold;
+                    color: #333;
+                }}
+                .gene-expr {{
+                    color: #666;
+                    font-size: 12px;
+                }}
+                .chamber-bar {{
+                    height: 30px;
+                    background: #e0e0e0;
+                    border-radius: 4px;
+                    margin: 5px 0;
+                    position: relative;
+                    overflow: hidden;
+                }}
+                .chamber-fill {{
+                    height: 100%;
+                    background: linear-gradient(90deg, #667eea, #764ba2);
+                    display: flex;
+                    align-items: center;
+                    padding-left: 10px;
+                    color: white;
+                    font-weight: bold;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🔬 Cluster {cluster_id} Detailed Analysis</h1>
+                <p>Comprehensive view of cell population and communication patterns</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Cells</h3>
+                    <div class="value">{n_cells:,}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Genes Detected</h3>
+                    <div class="value">{stats['n_genes']:,}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg UMI Count</h3>
+                    <div class="value">{stats['total_counts_mean']:.0f}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Genes/Cell</h3>
+                    <div class="value">{stats['n_genes_by_counts_mean']:.0f}</div>
+                </div>
+            </div>
+        """
+        
+        # Add chamber distribution if available
+        if 'chamber_distribution' in stats:
+            total_cells = sum(stats['chamber_distribution'].values())
+            html_content += """
+            <div class="section">
+                <h2>📍 Chamber Distribution</h2>
+            """
+            for chamber, count in sorted(stats['chamber_distribution'].items(), key=lambda x: x[1], reverse=True):
+                percentage = (count / total_cells) * 100
+                html_content += f"""
+                <div style="margin: 10px 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span><strong>{chamber}</strong></span>
+                        <span>{count:,} cells ({percentage:.1f}%)</span>
+                    </div>
+                    <div class="chamber-bar">
+                        <div class="chamber-fill" style="width: {percentage}%;">
+                            {percentage:.1f}%
+                        </div>
+                    </div>
+                </div>
+                """
+            html_content += "</div>"
+        
+        # Add top expressed genes
+        html_content += """
+            <div class="section">
+                <h2>🧬 Top 20 Expressed Genes</h2>
+                <div class="gene-list">
+        """
+        for gene_name, expr_val in top_genes:
+            html_content += f"""
+                <div class="gene-item">
+                    <div class="gene-name">{gene_name}</div>
+                    <div class="gene-expr">Expression: {expr_val:.2f}</div>
+                </div>
+            """
+        html_content += """
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Save to temporary file
+        detail_path = tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8').name
+        with open(detail_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        return {
+            'stats': stats,
+            'html_path': detail_path
+        }
+        
+    except Exception as e:
+        import traceback
+        print(f"Error creating cluster detail view: {e}")
+        print(traceback.format_exc())
         return None
 
 
