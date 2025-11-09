@@ -85,12 +85,17 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
             temp_dir = tempfile.mkdtemp()
             
             try:
-                # Extract tar file
+                # Extract tar file (with filter for Python 3.12+ compatibility)
                 with tarfile.open(uploaded_file, 'r:*') as tar:
-                    tar.extractall(temp_dir)
+                    # Use data filter for Python 3.12+ to suppress warning
+                    try:
+                        tar.extractall(temp_dir, filter='data')
+                    except TypeError:
+                        # Fallback for older Python versions that don't support filter
+                        tar.extractall(temp_dir)
                     print(f"✓ Extracted {len(tar.getmembers())} files")
                 
-                # Look for compatible files
+                # Look for compatible files recursively
                 extracted_files = list(Path(temp_dir).rglob('*'))
                 
                 # Debug: Show what files were found
@@ -114,11 +119,64 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
                 if file_extensions:
                     print(f"  File types found: {file_extensions}")
                 
-                # Check for files with full name patterns (including .gz)
-                h5ad_files = [f for f in extracted_files if f.name.lower().endswith('.h5ad') or f.name.lower().endswith('.h5ad.gz')]
-                h5_files = [f for f in extracted_files if (f.name.lower().endswith('.h5') or f.name.lower().endswith('.h5.gz')) 
+                # Check for files with full name patterns (including .gz) - RECURSIVELY
+                h5ad_files = [f for f in extracted_files if f.is_file() and (f.name.lower().endswith('.h5ad') or f.name.lower().endswith('.h5ad.gz'))]
+                h5_files = [f for f in extracted_files if f.is_file() and (f.name.lower().endswith('.h5') or f.name.lower().endswith('.h5.gz')) 
                            and not f.name.lower().endswith('.h5ad') and not f.name.lower().endswith('.h5ad.gz')]
-                mtx_dirs = [f.parent for f in extracted_files if 'matrix.mtx' in f.name.lower()]
+                
+                # Find matrix.mtx files and their parent directories (support nested structures)
+                mtx_files_found = [f for f in extracted_files if f.is_file() and 'matrix.mtx' in f.name.lower()]
+                print(f"  Found {len(mtx_files_found)} matrix.mtx files")
+                
+                # For each matrix file, check if its directory contains the required companions
+                valid_mtx_dirs = []
+                seen_dirs = set()  # Avoid duplicates
+                
+                for mtx_file in mtx_files_found:
+                    mtx_dir = mtx_file.parent
+                    
+                    # Skip if we've already processed this directory
+                    if str(mtx_dir) in seen_dirs:
+                        continue
+                    seen_dirs.add(str(mtx_dir))
+                    
+                    # Check for genes/features and barcodes in the same directory
+                    dir_files = [f.name.lower() for f in mtx_dir.iterdir() if f.is_file()]
+                    has_genes = any('genes.tsv' in fn or 'features.tsv' in fn for fn in dir_files)
+                    has_barcodes = any('barcodes.tsv' in fn for fn in dir_files)
+                    
+                    if has_genes and has_barcodes:
+                        valid_mtx_dirs.append(mtx_dir)
+                        rel_path = mtx_dir.relative_to(temp_dir) if mtx_dir != Path(temp_dir) else Path('.')
+                        print(f"  ✓ Valid 10x directory found: {rel_path}")
+                
+                mtx_dirs = valid_mtx_dirs
+                print(f"  Total unique valid directories: {len(mtx_dirs)}")
+                
+                # If no valid directories found yet, try looking for common 10x folder structures
+                if not mtx_dirs and not h5ad_files and not h5_files:
+                    print("  Searching for common 10x folder structures...")
+                    # Common Cell Ranger output paths
+                    common_paths = [
+                        'filtered_feature_bc_matrix',
+                        'outs/filtered_feature_bc_matrix',
+                        'filtered_gene_bc_matrices',
+                        'raw_feature_bc_matrix',
+                        'outs/raw_feature_bc_matrix'
+                    ]
+                    
+                    for common_path in common_paths:
+                        search_dirs = list(Path(temp_dir).rglob(common_path))
+                        for search_dir in search_dirs:
+                            if search_dir.is_dir():
+                                dir_files = [f.name.lower() for f in search_dir.iterdir() if f.is_file()]
+                                has_matrix = any('matrix.mtx' in fn for fn in dir_files)
+                                has_genes = any('genes.tsv' in fn or 'features.tsv' in fn for fn in dir_files)
+                                has_barcodes = any('barcodes.tsv' in fn for fn in dir_files)
+                                
+                                if has_matrix and has_genes and has_barcodes:
+                                    mtx_dirs.append(search_dir)
+                                    print(f"  ✓ Found 10x data in: {search_dir.relative_to(temp_dir)}")
                 
                 if h5ad_files:
                     print(f"✓ Found {len(h5ad_files)} .h5ad file(s). Loading first one...")
@@ -175,39 +233,98 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
                         print("  ⚠ No .h5 files could be loaded, trying other formats...")
                         adata = None
                 elif mtx_dirs:
-                    print(f"✓ Found matrix.mtx format. Loading from {mtx_dirs[0].name}...")
-                    mtx_dir = mtx_dirs[0]
+                    print(f"✓ Found {len(mtx_dirs)} matrix.mtx directories. Loading first valid one...")
+                    adata = None
                     
-                    # Check for required files (matrix, genes/features, barcodes)
-                    mtx_files = list(mtx_dir.glob('matrix.mtx*'))
-                    gene_files = list(mtx_dir.glob('genes.tsv*')) or list(mtx_dir.glob('features.tsv*'))
-                    barcode_files = list(mtx_dir.glob('barcodes.tsv*'))
+                    # Try each directory until one loads successfully
+                    for idx, mtx_dir in enumerate(mtx_dirs):
+                        try:
+                            print(f"  Attempting to load from: {mtx_dir.relative_to(temp_dir) if mtx_dir != Path(temp_dir) else 'root'}")
+                            
+                            # List all files in this directory for debugging
+                            all_files = [f for f in mtx_dir.iterdir() if f.is_file()]
+                            print(f"    Files in directory: {[f.name for f in all_files[:10]]}")  # Show first 10
+                            
+                            # Find the actual files (case-insensitive)
+                            mtx_files = [f for f in all_files if 'matrix.mtx' in f.name.lower()]
+                            gene_files = [f for f in all_files if 'genes.tsv' in f.name.lower() or 'features.tsv' in f.name.lower()]
+                            barcode_files = [f for f in all_files if 'barcodes.tsv' in f.name.lower()]
+                            
+                            print(f"    Matrix files: {[f.name for f in mtx_files]}")
+                            print(f"    Gene/feature files: {[f.name for f in gene_files]}")
+                            print(f"    Barcode files: {[f.name for f in barcode_files]}")
+                            
+                            if not mtx_files or not gene_files or not barcode_files:
+                                print(f"    ⚠ Missing required files, skipping...")
+                                continue
+                            
+                            # Check if files have standard names or prefixed names
+                            has_standard_names = any(f.name.lower() in ['matrix.mtx', 'matrix.mtx.gz'] for f in mtx_files)
+                            
+                            if not has_standard_names and len(mtx_files) > 0:
+                                # Multiple samples with prefixed names - need to handle differently
+                                print(f"    ⚠ Non-standard naming detected ({len(mtx_files)} samples with prefixes)")
+                                print(f"    This archive contains multiple samples. Loading first sample: {mtx_files[0].stem}")
+                                
+                                # Find matching features and barcodes for the first sample
+                                # Extract sample prefix (e.g., 'GSM4307515_N-1-LVP' from 'GSM4307515_N-1-LVP_matrix.mtx.gz')
+                                first_mtx = mtx_files[0]
+                                sample_prefix = first_mtx.name.replace('_matrix.mtx.gz', '').replace('_matrix.mtx', '')
+                                
+                                matching_features = [f for f in gene_files if sample_prefix in f.name]
+                                matching_barcodes = [f for f in barcode_files if sample_prefix in f.name]
+                                
+                                if not matching_features or not matching_barcodes:
+                                    print(f"    ⚠ Could not find matching features/barcodes for {sample_prefix}")
+                                    continue
+                                
+                                # Decompress and create symlinks with standard names
+                                import gzip
+                                standard_matrix = mtx_dir / 'matrix.mtx'
+                                standard_features = mtx_dir / 'features.tsv'
+                                standard_barcodes = mtx_dir / 'barcodes.tsv'
+                                
+                                # Decompress and copy to standard names
+                                for src, dst in [(first_mtx, standard_matrix), 
+                                               (matching_features[0], standard_features),
+                                               (matching_barcodes[0], standard_barcodes)]:
+                                    if src.name.endswith('.gz'):
+                                        print(f"    Extracting {src.name} → {dst.name}")
+                                        with gzip.open(src, 'rb') as f_in:
+                                            with open(dst, 'wb') as f_out:
+                                                f_out.write(f_in.read())
+                                    else:
+                                        import shutil
+                                        shutil.copy(src, dst)
+                                
+                                print(f"    ✓ Created standard 10x structure for sample: {sample_prefix}")
+                            else:
+                                # Standard naming - decompress .gz files if present
+                                import gzip
+                                for file_list in [mtx_files, gene_files, barcode_files]:
+                                    for f in file_list:
+                                        if f.name.endswith('.gz'):
+                                            decompressed_path = f.parent / f.name[:-3]  # Remove .gz
+                                            if not decompressed_path.exists():
+                                                print(f"    Decompressing {f.name}...")
+                                                with gzip.open(f, 'rb') as f_in:
+                                                    with open(decompressed_path, 'wb') as f_out:
+                                                        f_out.write(f_in.read())
+                                                print(f"      ✓ Decompressed to {decompressed_path.name}")
+                            
+                            # Try to read the MTX directory
+                            adata = sc.read_10x_mtx(str(mtx_dir))
+                            print(f"  ✓ Successfully loaded MTX format from directory {idx+1}/{len(mtx_dirs)}")
+                            break  # Success, exit loop
+                            
+                        except Exception as mtx_err:
+                            print(f"  ⚠ Failed to load from directory {idx+1}: {str(mtx_err)[:200]}")
+                            if idx < len(mtx_dirs) - 1:
+                                print(f"    Trying next directory...")
+                            continue
                     
-                    print(f"  Found in {mtx_dir.name}:")
-                    print(f"    Matrix files: {[f.name for f in mtx_files]}")
-                    print(f"    Gene/feature files: {[f.name for f in gene_files]}")
-                    print(f"    Barcode files: {[f.name for f in barcode_files]}")
-                    
-                    # Decompress .gz files if present
-                    import gzip
-                    for file_list in [mtx_files, gene_files, barcode_files]:
-                        for f in file_list:
-                            if f.name.endswith('.gz'):
-                                print(f"  Decompressing {f.name}...")
-                                decompressed_path = f.parent / f.name[:-3]  # Remove .gz
-                                if not decompressed_path.exists():
-                                    with gzip.open(f, 'rb') as f_in:
-                                        with open(decompressed_path, 'wb') as f_out:
-                                            f_out.write(f_in.read())
-                                    print(f"    ✓ Decompressed to {decompressed_path.name}")
-                    
-                    # Try to read the MTX directory
-                    try:
-                        adata = sc.read_10x_mtx(str(mtx_dir))
-                        print(f"  ✓ Successfully loaded MTX format")
-                    except Exception as mtx_err:
-                        print(f"  ⚠ Failed to load MTX: {str(mtx_err)[:200]}")
-                        adata = None
+                    if adata is None:
+                        print(f"  ⚠ Could not load any of the {len(mtx_dirs)} matrix directories")
                 else:
                     adata = None
                 
@@ -228,13 +345,35 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
                     
                     if adata is None:
                         shutil.rmtree(temp_dir)
-                        return None, " TAR archive doesn't contain compatible files (.h5ad, .h5, matrix.mtx, or expression matrices)"
+                        # Provide detailed error message about what was found
+                        error_details = f" **TAR Archive Extraction Failed**\n\n"
+                        error_details += f"Extracted {len([f for f in extracted_files if f.is_file()])} files but couldn't find compatible single-cell data.\n\n"
+                        error_details += f"**File types detected:** {file_extensions}\n\n"
+                        error_details += f"**What we looked for:**\n"
+                        error_details += f"- .h5ad files: Found {len(h5ad_files)}\n"
+                        error_details += f"- .h5 files: Found {len(h5_files)}\n"
+                        error_details += f"- matrix.mtx directories (with genes + barcodes): Found {len(valid_mtx_dirs)}\n\n"
+                        error_details += f"**Common issues:**\n"
+                        error_details += f"- Files are in non-standard nested directories\n"
+                        error_details += f"- Missing required companion files (genes.tsv, barcodes.tsv)\n"
+                        error_details += f"- Files use different compression or naming\n\n"
+                        error_details += f"**Recommendation:** Extract the archive locally, locate the filtered_feature_bc_matrix folder or .h5ad file, and upload that specific file/folder."
+                        return None, error_details
                 
                 if adata is not None:
                     print(f"✓ Successfully loaded from TAR archive: {adata.n_obs:,} cells × {adata.n_vars:,} genes")
                 else:
                     shutil.rmtree(temp_dir)
-                    return None, " TAR archive doesn't contain compatible files (.h5ad, .h5, matrix.mtx, or expression matrices)"
+                    # Provide detailed error message
+                    error_details = f" **TAR Archive Loading Failed**\n\n"
+                    error_details += f"Found potential data files but couldn't load them.\n\n"
+                    error_details += f"**File types detected:** {file_extensions}\n\n"
+                    error_details += f"**Files found:**\n"
+                    error_details += f"- .h5ad: {len(h5ad_files)}\n"
+                    error_details += f"- .h5: {len(h5_files)}\n"
+                    error_details += f"- Valid matrix.mtx directories: {len(valid_mtx_dirs)}\n\n"
+                    error_details += f"Try extracting and uploading the data file directly instead of as TAR."
+                    return None, error_details
                 
                 # Cleanup temp directory
                 shutil.rmtree(temp_dir)
@@ -247,8 +386,54 @@ def load_and_validate_data(uploaded_file) -> Tuple[ad.AnnData, str]:
         # Try reading based on file type
         elif is_h5ad:
             print(" Loading AnnData (.h5ad)...")
-            adata = sc.read_h5ad(uploaded_file)
-            print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
+            
+            # Try with retry logic for file locking issues
+            import time
+            max_retries = 3
+            retry_delay = 2  # seconds
+            
+            for attempt in range(max_retries):
+                try:
+                    # Use 'r' mode explicitly and ensure file is properly closed
+                    adata = sc.read_h5ad(uploaded_file, backed=None)
+                    print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
+                    break
+                except PermissionError as perm_err:
+                    if attempt < max_retries - 1:
+                        print(f"  ⚠ File locked, retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    else:
+                        # If all retries fail, try copying to a new location
+                        print(f"  ⚠ File still locked after {max_retries} attempts, trying workaround...")
+                        try:
+                            import shutil
+                            temp_copy = tempfile.NamedTemporaryFile(suffix='.h5ad', delete=False)
+                            temp_copy_path = temp_copy.name
+                            temp_copy.close()
+                            
+                            # Copy file to new location
+                            shutil.copy2(uploaded_file, temp_copy_path)
+                            print(f"  ✓ Copied to temporary location")
+                            
+                            # Try reading from copy
+                            adata = sc.read_h5ad(temp_copy_path, backed=None)
+                            print(f"✓ {adata.n_obs:,} cells × {adata.n_vars:,} genes")
+                            
+                            # Clean up temp file
+                            try:
+                                Path(temp_copy_path).unlink()
+                            except:
+                                pass
+                            break
+                        except Exception as copy_err:
+                            return None, (f" **File Access Error**\n\n"
+                                        f"Cannot access the uploaded file. This usually happens when:\n"
+                                        f"- The file is open in another program\n"
+                                        f"- Antivirus is scanning the file\n"
+                                        f"- Insufficient permissions\n\n"
+                                        f"**Solution:** Close the file in other programs and try again.\n\n"
+                                        f"Technical details: {str(perm_err)}")
         
         elif is_h5mu:
             print(" Loading MuData (.h5mu)...")
@@ -842,23 +1027,28 @@ def analyze_heart_data(
     max_cells,
     max_genes,
     include_chamber_analysis,
-    include_communication_hubs
-) -> Tuple[str, str, str, str, str, str, str, str]:
+    include_communication_hubs,
+    progress=gr.Progress()
+) -> Tuple[str, str, str, str, str, str, str, str, str]:
     """Comprehensive HeartMAP analysis with chamber-specific insights
     
     Returns:
-        Tuple of (output_msg, csv_file, viz_chamber, viz_hubs, viz_corr, viz_markers, viz_network, chamber_info)
+        Tuple of (output_msg, csv_file, viz_chamber, viz_hubs, viz_corr, viz_markers, viz_network, chamber_info, chamber_info_file)
     """
 
     if not HEARTMAP_AVAILABLE:
+        gr.Info(" HeartMAP dependencies not available", duration=5)
         return " HeartMAP not available. Please install dependencies.", None, None, None, None, None, None, "", None
 
     if uploaded_file is None:
-        return " Please upload a file.", None, None, None, None, None, None, "", None
+        gr.Info("⚠️ Please upload a data file", duration=3)
+        return "⚠️ Please upload a file.", None, None, None, None, None, None, "", None
 
     # Validate file upload completed successfully
+    progress(0, desc="🔍 Validating file...")
     try:
         if not Path(uploaded_file).exists():
+            gr.Warning("Upload incomplete - please try again", duration=5)
             return " Upload incomplete. Please try uploading the file again.", None, None, None, None, None, None, "", None
 
         file_size_mb = Path(uploaded_file).stat().st_size / (1024 * 1024)
@@ -866,12 +1056,18 @@ def analyze_heart_data(
         print(f"Processing file: {file_size_mb:.2f} MB ({file_size_gb:.2f} GB)")
 
         if file_size_mb > 10240:  # 10GB limit
+            gr.Warning(f"File too large: {file_size_gb:.2f} GB (max 10 GB)", duration=10)
             return f" File size ({file_size_gb:.2f} GB) exceeds maximum limit (10 GB). Please use a smaller dataset or subset your data.", None, None, None, None, None, None, "", None
         elif file_size_mb > 1024:  # Warn for files > 1GB
             print(f"Large file detected ({file_size_gb:.2f} GB). Processing may take 10-30 minutes...")
+            gr.Info(f" Large file ({file_size_gb:.2f} GB) - Processing may take 10-30 minutes. Please be patient!", duration=15)
         elif file_size_mb > 500:
             print(f"Large file detected ({file_size_mb:.1f} MB). Processing may take several minutes...")
+            gr.Info(f" Processing {file_size_mb:.1f} MB file - This may take several minutes", duration=10)
+        else:
+            gr.Info(f"✓ File validated ({file_size_mb:.1f} MB) - Starting analysis...", duration=5)
     except Exception as e:
+        gr.Warning(f"File validation error: {str(e)}", duration=8)
         return f" File validation error: {str(e)}. Please re-upload the file.", None, None, None, None, None, None, "", None
 
     persistent_csv = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
@@ -905,13 +1101,20 @@ def analyze_heart_data(
 
     try:
         # Load and validate data
+        progress(0.05, desc=" Loading data file...")
         print("Loading data...")
+        gr.Info(" Loading and validating data...", duration=5)
         adata, validation_msg = load_and_validate_data(uploaded_file)
         
         # Check if loading failed
         if adata is None:
+            gr.Warning("Data loading failed - check error details", duration=8)
             error_msg = f" **Data Loading Failed**\n\n{validation_msg}"
-            return error_msg, None, None, None, None, None, None, None
+            # Return all expected outputs (9) to match the Gradio interface:
+            # output_text, output_file, viz1, viz2, viz3, viz4, viz5, chamber_info, chamber_info_file
+            return error_msg, None, None, None, None, None, None, "", None
+        
+        gr.Info(f"✓ Data loaded: {adata.n_obs:,} cells × {adata.n_vars:,} genes", duration=5)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -919,9 +1122,25 @@ def analyze_heart_data(
             results_dir.mkdir(exist_ok=True)
 
             # Save loaded data to temporary h5ad file for pipeline
+            progress(0.15, desc="💾 Preparing data...")
             temp_data_file = temp_path / "loaded_data.h5ad"
             print(f"Saving loaded data to temporary file...")
-            adata.write_h5ad(temp_data_file)
+            
+            # Ensure any file handles are closed before writing
+            import gc
+            gc.collect()
+            
+            try:
+                adata.write_h5ad(temp_data_file)
+            except PermissionError:
+                # If write fails, it might be because the original is still locked
+                # Create a copy in memory and write that instead
+                print("  ⚠ Permission issue, creating in-memory copy...")
+                adata_copy = adata.copy()
+                adata_copy.write_h5ad(temp_data_file)
+                adata = adata_copy
+                del adata_copy
+                gc.collect()
 
             # Create config
             config = Config.default()
@@ -933,6 +1152,8 @@ def analyze_heart_data(
             config.create_directories()
 
             # Run appropriate pipeline
+            progress(0.20, desc=" Running analysis pipeline...")
+            gr.Info(f" Running {analysis_type} analysis pipeline...", duration=8)
             if analysis_type == "comprehensive":
                 pipeline = ComprehensivePipeline(config)
             elif analysis_type == "basic":
@@ -943,8 +1164,12 @@ def analyze_heart_data(
                 pipeline = BasicPipeline(config)
 
             # Pass temporary h5ad file instead of original file
+            print(f"=== Running {analysis_type.upper()} HeartMAP Pipeline ===")
             results = pipeline.run(str(temp_data_file), str(results_dir))
             analyzed_adata = results.get('adata', adata)
+            
+            progress(0.40, desc="✓ Analysis complete, generating results...")
+            gr.Info("✓ Analysis complete! Generating visualizations...", duration=5)
 
             # ===== CREATE COMPREHENSIVE SUMMARY =====
             summary_data = {
@@ -974,11 +1199,13 @@ def analyze_heart_data(
             ])
 
             # ===== CHAMBER ANALYSIS =====
+            progress(0.50, desc=" Analyzing chamber distribution...")
             chamber_stats = None
             chamber_correlations = None
             chamber_markers = None
             
             if include_chamber_analysis and 'chamber' in analyzed_adata.obs.columns:
+                gr.Info(" Performing chamber-specific analysis...", duration=5)
                 # Filter out Unknown chambers
                 valid_chambers = analyzed_adata.obs['chamber'] != 'Unknown'
                 if valid_chambers.sum() == 0:
@@ -1000,7 +1227,9 @@ def analyze_heart_data(
                         summary_data['Value'].append(f"{chamber_counts[chamber]:,} ({chamber_proportions[chamber]:.1f}%)")
                 
                     # ===== CROSS-CHAMBER CORRELATION ANALYSIS =====
+                    progress(0.60, desc=" Calculating chamber correlations...")
                     print("Calculating cross-chamber gene expression correlations...")
+                    gr.Info(" Computing cross-chamber correlations...", duration=5)
                 
                     if len(chamber_counts) > 1:
                         # Calculate mean expression per chamber
@@ -1077,9 +1306,11 @@ def analyze_heart_data(
                         summary_data['Value'].append(f"{sum(len(m) for m in marker_genes.values())} genes identified")
 
             # ===== COMMUNICATION HUBS =====
+            progress(0.70, desc=" Analyzing communication hubs...")
             hub_stats = None
             if include_communication_hubs:
                 print("Communication hubs analysis requested...")
+                gr.Info(" Identifying communication hub cell types...", duration=5)
                 print(f"  Available metadata columns: {list(analyzed_adata.obs.columns)}")
                 
                 # Detect cluster column (try multiple common names)
@@ -1125,6 +1356,8 @@ def analyze_heart_data(
             summary_df.to_csv(persistent_csv_path, index=False)
             
             # ===== CREATE INTERACTIVE VISUALIZATIONS =====
+            progress(0.80, desc=" Creating visualizations...")
+            gr.Info(" Generating interactive visualizations...", duration=5)
             viz_chamber_file = None
             viz_hubs_file = None
             viz_corr_file = None
@@ -1294,6 +1527,8 @@ def analyze_heart_data(
             
             # 5. Communication Network Graph (Interactive knowledge graph)
             if include_communication_hubs and hub_stats is not None and len(hub_stats) > 0:
+                progress(0.90, desc=" Building communication network...")
+                gr.Info(" Creating cell-cell communication network...", duration=5)
                 print("Creating interactive communication network...")
                 viz_network_file = create_communication_network(analyzed_adata, hub_stats, chamber_stats)
                 if viz_network_file:
@@ -1425,6 +1660,10 @@ Download the HTML files below for fully interactive analysis!
             else:
                 viz_network_file = None
             
+            # Final progress update
+            progress(1.0, desc=" Analysis complete!")
+            gr.Info(" Analysis complete! Download your results below.", duration=8)
+            
             return (
                 output_msg, 
                 persistent_csv_path, 
@@ -1440,6 +1679,9 @@ Download the HTML files below for fully interactive analysis!
     except Exception as e:
         import traceback
         error_type = type(e).__name__
+        
+        # Show error notification
+        gr.Warning(f"Analysis failed: {error_type}", duration=10)
 
         # Handle specific error types
         if "ClientDisconnect" in error_type or "ClientDisconnect" in str(e):
